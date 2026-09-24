@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="760" viewBox="0 0 1200 760">
+<style>
+.box{fill:#f7f7f7;stroke:#222;stroke-width:2}.title{font:700 22px Arial}.txt{font:16px Arial}.small{font:14px Arial}
+.line{stroke:#222;stroke-width:2;marker-end:url(#arrow)}
+</style>
+<defs><marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto"><path d="M0,0 L10,3 L0,6 z"/></marker></defs>
+<text x="600" y="35" text-anchor="middle" class="title">CATI QA Test Platform — Architecture</text>
+<rect x="430" y="60" width="340" height="80" rx="10" class="box"/>
+<text x="600" y="92" text-anchor="middle" class="title">QA User</text><text x="600" y="120" text-anchor="middle" class="txt">Developer / QA / TL</text>
+<line x1="600" y1="140" x2="600" y2="185" class="line"/>
+<rect x="350" y="185" width="500" height="110" rx="10" class="box"/>
+<text x="600" y="220" text-anchor="middle" class="title">QA Dashboard</text>
+<text x="600" y="250" text-anchor="middle" class="txt">Run Tests • Test Runs • Failures • Reports</text>
+<line x1="600" y1="295" x2="600" y2="340" class="line"/>
+<rect x="350" y="340" width="500" height="110" rx="10" class="box"/>
+<text x="600" y="375" text-anchor="middle" class="title">QA Backend</text>
+<text x="600" y="405" text-anchor="middle" class="txt">Orchestration • Results • Bug/Severity APIs</text>
+<line x1="470" y1="450" x2="300" y2="505" class="line"/>
+<line x1="730" y1="450" x2="900" y2="505" class="line"/>
+<rect x="100" y="505" width="400" height="110" rx="10" class="box"/>
+<text x="300" y="540" text-anchor="middle" class="title">QA Database</text>
+<text x="300" y="570" text-anchor="middle" class="txt">Runs • Results • Failures • Severity</text>
+<rect x="700" y="505" width="400" height="110" rx="10" class="box"/>
+<text x="900" y="540" text-anchor="middle" class="title">Test Engine</text>
+<text x="900" y="570" text-anchor="middle" class="txt">Playwright • API • UI • E2E • WS • AI</text>
+<line x1="900" y1="615" x2="900" y2="665" class="line"/>
+<rect x="300" y="665" width="600" height="70" rx="10" class="box"/>
+<text x="600" y="694" text-anchor="middle" class="title">CATI — System Under Test</text>
+<text x="600" y="720" text-anchor="middle" class="txt">Frontend • Backend • AI Engine • Existing Services</text>
+</svg>

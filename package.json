@@ -1,0 +1,16 @@
+{
+  "name": "cati-test-platform",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Independent automated QA platform for CATI AI",
+  "scripts": {
+    "test": "playwright test",
+    "test:ui": "playwright test --ui",
+    "test:report": "playwright show-report",
+    "test:smoke": "playwright test tests/smoke"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.55.0",
+    "dotenv": "^17.2.1"
+  }
+}
