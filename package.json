@@ -2,12 +2,14 @@
   "name": "cati-test-platform",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "description": "Independent automated QA platform for CATI AI",
   "scripts": {
     "test": "playwright test",
     "test:ui": "playwright test --ui",
     "test:report": "playwright show-report",
-    "test:smoke": "playwright test tests/smoke"
+    "test:smoke": "playwright test tests/smoke",
+    "test:qa-report": "cmd /c \"npx playwright test --reporter=json > reports\\playwright-results.json && node reports\\testNormalizer.js\""
   },
   "devDependencies": {
     "@playwright/test": "^1.55.0",
