@@ -9,4 +9,5 @@ artifacts/generated/
 coverage/
 .DS_Store
 *.log
+playwright/.auth/
 reports/playwright-results.json
