@@ -1,3 +1,6 @@
+import "dotenv/config";
+import fs from "fs";
+
 import { classifyFailure } from "./failureClassifier.js";
 import { classifySeverity } from "./severityClassifier.js";
 import { parseAssertionError } from "./assertionParser.js";
@@ -7,6 +10,21 @@ function readJsonAttachment(attachment) {
   }
 
   return JSON.parse(Buffer.from(attachment.body, "base64").toString("utf-8"));
+}
+function readErrorContext(attachments = []) {
+  const attachment = attachments.find(
+    (attachment) => attachment.name === "error-context",
+  );
+
+  if (!attachment?.path) {
+    return "";
+  }
+
+  try {
+    return fs.readFileSync(attachment.path, "utf-8");
+  } catch {
+    return "";
+  }
 }
 function normalizeAttachments(attachments = []) {
   const evidence = {};
@@ -26,19 +44,19 @@ function normalizeAttachments(attachments = []) {
 
     if (attachment.name === "error-context") {
       evidence.errorContext = attachment.path;
-      }
+    }
 
-      if (attachment.name === "console-logs") {
-        evidence.consoleLogs = readJsonAttachment(attachment);
-      }
+    if (attachment.name === "console-logs") {
+      evidence.consoleLogs = readJsonAttachment(attachment);
+    }
 
-      if (attachment.name === "requests") {
-        evidence.requests = readJsonAttachment(attachment);
-      }
+    if (attachment.name === "requests") {
+      evidence.requests = readJsonAttachment(attachment);
+    }
 
-      if (attachment.name === "responses") {
-        evidence.responses = readJsonAttachment(attachment);
-      }
+    if (attachment.name === "responses") {
+      evidence.responses = readJsonAttachment(attachment);
+    }
   }
 
   return evidence;
@@ -66,7 +84,19 @@ export function normalizeTestResult(spec, result) {
           message: result.error.message,
           stack: result.error.stack,
 
-          ...parseAssertionError(result.error.message),
+          ...parseAssertionError(
+            result.error.message,
+            result.attachments?.find(
+              (attachment) => attachment.name === "error-context",
+            )?.path
+              ? fs.readFileSync(
+                  result.attachments.find(
+                    (attachment) => attachment.name === "error-context",
+                  ).path,
+                  "utf-8",
+                )
+              : "",
+          ),
 
           classification: classifyFailure(spec.file),
           severity: classifySeverity(result.error.message, spec.file),

@@ -9,7 +9,7 @@
     "test:ui": "playwright test --ui",
     "test:report": "playwright show-report",
     "test:smoke": "playwright test tests/smoke",
-    "test:qa-report": "cmd /c \"npx playwright test --reporter=json > reports\\playwright-results.json && node reports\\testNormalizer.js\""
+    "test:qa-report": "node reports/runQaReport.js"
   },
   "devDependencies": {
     "@playwright/test": "^1.55.0",

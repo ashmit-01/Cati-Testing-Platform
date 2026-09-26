@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../fixtures/evidence.js';
 
 test('Agents page loads successfully', async ({ page }) => {
     await page.goto('/agents');

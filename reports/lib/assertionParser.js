@@ -2,8 +2,9 @@ function stripAnsi(text) {
   return text.replace(/\u001b\[[0-9;]*m/g, "");
 }
 
-export function parseAssertionError(message = "") {
+export function parseAssertionError(message = "", errorContext = "") {
   const cleanMessage = stripAnsi(message);
+  const cleanContext = stripAnsi(errorContext);
   const lines = cleanMessage.split("\n");
 
   // Format 1:
@@ -25,6 +26,50 @@ export function parseAssertionError(message = "") {
   }
 
   // Format 2:
+  // Expected pattern: /.../
+  // Received string: "..."
+  const expectedPatternLine = lines.find((line) =>
+    line.trim().startsWith("Expected pattern:"),
+  );
+
+  const receivedStringLine = lines.find((line) =>
+    line.trim().startsWith("Received string:"),
+  );
+
+  if (expectedPatternLine && receivedStringLine) {
+    return {
+      expected:
+        expectedPatternLine
+          .replace(/^.*Expected pattern:\s*/, "")
+          .trim()
+          .replace(/\\\\/g, "\\") || null,
+
+      actual:
+        receivedStringLine.replace(/^.*Received string:\s*/, "").trim() || null,
+    };
+  }
+
+  // Format 3:
+  // Expected: visible
+  // Error: element(s) not found
+  const expectedVisibilityLine = lines.find((line) =>
+    line.trim().startsWith("Expected:"),
+  );
+
+  const elementErrorLine = lines.find((line) =>
+    line.trim().startsWith("Error: element(s) not found"),
+  );
+
+  if (expectedVisibilityLine && elementErrorLine) {
+    return {
+      expected:
+        expectedVisibilityLine.replace(/^.*Expected:\s*/, "").trim() || null,
+
+      actual: "element(s) not found",
+    };
+  }
+
+  // Format 4:
   // Expected substring / Received string
   const receivedIndex = lines.findIndex((line) =>
     line.includes("Received string"),
@@ -64,8 +109,17 @@ export function parseAssertionError(message = "") {
     };
   }
 
-  return {
-    expected: null,
-    actual: null,
-  };
+  // Fallback: Playwright assertion details from error-context.md
+  const contextExpected = cleanContext.match(/Expected pattern:\s*(.+)/);
+
+  const contextActual = cleanContext.match(/Received string:\s*"([^"]+)"/);
+
+  if (contextExpected && contextActual) {
+    return {
+      expected: contextExpected[1].trim(),
+      actual: contextActual[1].trim(),
+    };
+  }
+
+  return { expected: null, actual: null };
 }
