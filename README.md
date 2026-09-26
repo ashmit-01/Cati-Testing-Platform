@@ -93,3 +93,13 @@ npx playwright show-report
 ## Safety
 
 Only run authorized tests against CATI environments. Destructive operations, real calls, paid operations, and production data changes should use approved test resources or a dedicated QA/staging environment.
+
+### API Testing Safety Classifications
+All tests within the `test-engine/api` module are categorized by their side effects to ensure safe execution:
+
+- **READ-ONLY**: Operations that fetch data without modifying state (e.g., `GET /api/agents`). Always safe.
+- **TEST-DATA MUTATION**: Operations that modify data scoped strictly to the test user or mock data (e.g., `POST /api/agents`). Safe, but leaves isolated test data behind.
+- **EXTERNAL SIDE EFFECT**: Operations that trigger third-party services (e.g., Twilio calls, Stripe charges). These are typically protected by environment flags (`ALLOW_REAL_CALLS`, `ALLOW_LIVE_PAYMENTS`) and are fail-closed.
+- **STAGING/SANDBOX ONLY**: Operations safe to run only in isolated, non-production environments.
+- **INTENTIONALLY SKIPPED**: Tests written for documentation/coverage but disabled in standard CI runs due to cost, destructiveness, or lack of mock capabilities.
+- **MOCK REQUIRED**: Tests that rely on specific mocking behavior in the backend or an interception layer to pass safely.
