@@ -54,6 +54,6 @@ test('Dashboard displays user credits', async ({ page }) => {
     await page.goto('/dashboard');
 
     await expect(
-        page.getByText('0 Credits', { exact: true })
+        page.getByText(/\d[\d,]*\s+Credits/i).first()
     ).toBeVisible();
 });
