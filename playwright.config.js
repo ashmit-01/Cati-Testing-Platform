@@ -6,27 +6,42 @@ export default defineConfig({
 
     timeout: 30_000,
 
-    fullyParallel: true,
+    expect: {
+        timeout: 5_000
+    },
+
+    fullyParallel: false,
 
     retries: process.env.CI ? 1 : 0,
 
     reporter: [
         ['list'],
-        ['html', { outputFolder: 'playwright-report', open: 'never' }]
+        ['html', {
+            outputFolder: 'playwright-report',
+            open: 'never'
+        }]
     ],
 
     use: {
         baseURL: process.env.FRONTEND_URL || 'https://usecati.com',
+
         headless: true,
+
+        actionTimeout: 10_000,
+
+        navigationTimeout: 15_000,
+
         screenshot: 'only-on-failure',
+
         video: 'retain-on-failure',
+
         trace: 'retain-on-failure'
     },
 
     projects: [
         {
             name: 'setup',
-            testMatch: /.*\.setup\.js/,
+            testMatch: /.*\.setup\.js/
         },
 
         {
@@ -38,9 +53,9 @@ export default defineConfig({
             ],
             use: {
                 browserName: 'chromium',
-                storageState: 'playwright/.auth/user.json',
+                storageState: 'playwright/.auth/user.json'
             },
-            dependencies: ['setup'],
+            dependencies: ['setup']
         },
 
         {
@@ -51,7 +66,15 @@ export default defineConfig({
             ],
             use: {
                 browserName: 'chromium',
-                storageState: undefined,
+                storageState: undefined
+            }
+        },
+
+        {
+            name: 'api',
+            testMatch: /api\/specs\/.*\.spec\.js/,
+            use: {
+                baseURL: process.env.BACKEND_URL || 'http://localhost:5000',
             },
         },
 
