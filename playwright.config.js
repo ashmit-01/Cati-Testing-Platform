@@ -41,40 +41,41 @@ export default defineConfig({
     projects: [
         {
             name: 'setup',
-
             testMatch: /.*\.setup\.js/
         },
 
         {
             name: 'chromium',
-
             testIgnore: [
                 '**/login.spec.js',
-                '**/landing.spec.js'
+                '**/landing.spec.js',
+                '**/api/**',
             ],
-
             use: {
                 browserName: 'chromium',
-
                 storageState: 'playwright/.auth/user.json'
             },
-
             dependencies: ['setup']
         },
 
         {
             name: 'unauthenticated',
-
             testMatch: [
                 '**/login.spec.js',
                 '**/landing.spec.js'
             ],
-
             use: {
                 browserName: 'chromium',
-
                 storageState: undefined
             }
-        }
-    ]
+        },
+
+        {
+            name: 'api',
+            testMatch: /api\/specs\/.*\.spec\.js/,
+            use: {
+                baseURL: process.env.BACKEND_URL || 'http://localhost:5000',
+            },
+        },
+    ],
 });
