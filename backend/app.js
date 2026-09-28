@@ -1,32 +1,125 @@
-import express from 'express';
-import cors from 'cors';
-import apiRoutes from './routes/index.js';
-import { errorMiddleware, notFoundMiddleware } from './middleware/errorMiddleware.js';
+import express from 'express'
+import cors from 'cors'
+import path from 'path'
+import { fileURLToPath } from 'url'
 
-/**
- * Builds and returns the Express app without starting a listener, so it
- * can be imported by tests or by server.js.
- */
+import apiRoutes from './routes/index.js'
+import {
+  errorMiddleware,
+  notFoundMiddleware
+} from './middleware/errorMiddleware.js'
+
+
+// ============================================================
+// PATH SETUP
+// ============================================================
+
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
+
+// Project root:
+// D:\New folder\Cati_OA_Platform
+const PROJECT_ROOT = path.resolve(__dirname, '..')
+
+// Playwright evidence folder:
+// D:\New folder\Cati_OA_Platform\test-results
+const TEST_RESULTS_DIR = path.join(
+  PROJECT_ROOT,
+  'test-results'
+)
+
+
+// ============================================================
+// CREATE APP
+// ============================================================
+
 export function createApp() {
-    const app = express();
 
-    // CORS: restrict to the known dashboard origin when configured, but
-    // don't hard-fail local development if it isn't set yet.
-    const allowedOrigin = process.env.FRONTEND_ORIGIN;
-    app.use(
-        cors(
-            allowedOrigin
-                ? { origin: allowedOrigin }
-                : { origin: process.env.NODE_ENV === 'production' ? false : '*' }
-        )
-    );
+  const app = express()
 
-    app.use(express.json());
 
-    app.use('/api', apiRoutes);
+  // ==========================================================
+  // CORS
+  // ==========================================================
 
-    app.use(notFoundMiddleware);
-    app.use(errorMiddleware);
+  const allowedOrigin =
+    process.env.FRONTEND_ORIGIN
 
-    return app;
+  app.use(
+    cors(
+      allowedOrigin
+        ? {
+            origin: allowedOrigin
+          }
+        : {
+            origin:
+              process.env.NODE_ENV === 'production'
+                ? false
+                : '*'
+          }
+    )
+  )
+
+
+  // ==========================================================
+  // JSON
+  // ==========================================================
+
+  app.use(
+    express.json()
+  )
+
+
+  // ==========================================================
+  // PLAYWRIGHT EVIDENCE
+  // ==========================================================
+
+  /*
+   * Expose Playwright screenshots, videos,
+   * traces and other test artifacts.
+   *
+   * Physical file:
+   *
+   * D:\New folder\Cati_OA_Platform\test-results\...
+   *
+   * Browser URL:
+   *
+   * http://localhost:5001/test-results/...
+   */
+
+  app.use(
+    '/test-results',
+    express.static(TEST_RESULTS_DIR)
+  )
+
+
+  // ==========================================================
+  // API ROUTES
+  // ==========================================================
+
+  app.use(
+    '/api',
+    apiRoutes
+  )
+
+
+  // ==========================================================
+  // 404
+  // ==========================================================
+
+  app.use(
+    notFoundMiddleware
+  )
+
+
+  // ==========================================================
+  // ERROR
+  // ==========================================================
+
+  app.use(
+    errorMiddleware
+  )
+
+
+  return app
 }

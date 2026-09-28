@@ -63,7 +63,7 @@ export default function Sidebar({ open, onClose }) {
 
         <div className="border-t border-border px-5 py-4">
           <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-secondary">Environment</p>
-          <EnvironmentBadge environment="STAGING" />
+          <EnvironmentBadge environment="PRODUCTION" />
         </div>
       </aside>
     </>

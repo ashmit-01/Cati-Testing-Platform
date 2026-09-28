@@ -17,7 +17,7 @@ export default function Header({ onMenuClick }) {
           <p className="text-xs text-secondary">Testing &amp; Monitoring Platform</p>
         </div>
       </div>
-      <EnvironmentBadge environment="STAGING" className="hidden sm:inline-flex" />
+      <EnvironmentBadge environment="PRODUCTION" className="hidden sm:inline-flex" />
     </header>
   )
 }

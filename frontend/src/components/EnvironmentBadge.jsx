@@ -1,4 +1,4 @@
-export default function EnvironmentBadge({ environment = 'STAGING', className = '' }) {
+export default function EnvironmentBadge({ environment = 'PRODUCTION', className = '' }) {
   return (
     <span className={`inline-flex items-center gap-2 text-sm font-medium text-secondary ${className}`}>
       <span className="relative flex h-2 w-2">

@@ -1,0 +1,18 @@
+{
+  "name": "cati-qa-backend",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Node.js / Express / MongoDB backend for the CATI QA Test Platform",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "dependencies": {
+    "@playwright/test": "^1.55.0",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.1",
+    "express": "^5.1.0",
+    "mongoose": "^8.0.0"
+  }
+}
