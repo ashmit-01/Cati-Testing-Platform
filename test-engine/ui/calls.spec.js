@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from "../fixtures/evidence.js";
 
 test.describe('Calls - UI', () => {
 
@@ -31,7 +31,6 @@ test.describe('Calls - UI', () => {
         });
     });
 
-
     test('Call History displays calls or a valid empty state', async ({ page }) => {
 
         await page.goto('/calls', {
@@ -56,7 +55,6 @@ test.describe('Calls - UI', () => {
 
         if (rowCount > 0) {
 
-            // Production currently contains call data
             await expect(
                 callRows.first()
             ).toBeVisible({
@@ -65,7 +63,6 @@ test.describe('Calls - UI', () => {
 
         } else {
 
-            // No calls: verify the section rendered correctly
             await expect(
                 page.getByText('Call History', {
                     exact: true
@@ -74,7 +71,6 @@ test.describe('Calls - UI', () => {
                 timeout: 10_000
             });
 
-            // Make sure the application did not show a server/application error
             await expect(
                 page.locator('body')
             ).not.toContainText(
@@ -82,7 +78,6 @@ test.describe('Calls - UI', () => {
             );
         }
     });
-
 
     test('Scheduled Calls section is accessible', async ({ page }) => {
 
@@ -119,7 +114,6 @@ test.describe('Calls - UI', () => {
         });
     });
 
-
     test('User can switch between Call History and Scheduled Calls', async ({ page }) => {
 
         await page.goto('/calls', {
@@ -131,7 +125,6 @@ test.describe('Calls - UI', () => {
             timeout: 15_000
         });
 
-        // Verify Call History button
         const callHistoryButton = page.getByRole(
             'button',
             {
@@ -145,7 +138,6 @@ test.describe('Calls - UI', () => {
             timeout: 15_000
         });
 
-        // Verify Scheduled Calls button
         const scheduledCallsButton = page.getByRole(
             'button',
             {
@@ -159,7 +151,6 @@ test.describe('Calls - UI', () => {
             timeout: 15_000
         });
 
-        // Switch to Scheduled Calls
         await scheduledCallsButton.click();
 
         await expect(
@@ -170,7 +161,6 @@ test.describe('Calls - UI', () => {
             timeout: 10_000
         });
 
-        // Switch back to Call History
         await callHistoryButton.click();
 
         await expect(

@@ -2,88 +2,85 @@ import { defineConfig } from '@playwright/test';
 import 'dotenv/config';
 
 export default defineConfig({
-    testDir: './test-engine',
+  testDir: './test-engine',
 
-    timeout: 30_000,
+  timeout: 30_000,
 
-    expect: {
-        timeout: 5_000
+  expect: {
+    timeout: 5_000,
+  },
+
+  fullyParallel: true,
+
+  retries: process.env.CI ? 1 : 0,
+
+  reporter: [
+    ['list'],
+    ['html', { outputFolder: 'playwright-report', open: 'never' }],
+    ['./reports/jsonReporter.js'],
+  ],
+
+  use: {
+    baseURL: process.env.FRONTEND_URL || 'https://usecati.com',
+
+    headless: true,
+
+    actionTimeout: 10_000,
+
+    navigationTimeout: 15_000,
+
+    screenshot: 'only-on-failure',
+
+    video: 'retain-on-failure',
+
+    trace: 'retain-on-failure',
+  },
+
+  projects: [
+    {
+      name: 'setup',
+      testMatch: /.*\.setup\.js/,
     },
 
-    fullyParallel: false,
+    {
+      name: 'chromium',
 
-    retries: process.env.CI ? 1 : 0,
+      testIgnore: [
+        '**/login.spec.js',
+        '**/landing.spec.js',
+        '**/api/**',
+      ],
 
-    reporter: [
-        ['list'],
-        ['html', {
-            outputFolder: 'playwright-report',
-            open: 'never'
-        }]
-    ],
+      use: {
+        browserName: 'chromium',
+        storageState: 'playwright/.auth/user.json',
+      },
 
-    use: {
-        baseURL: process.env.FRONTEND_URL || 'https://usecati.com',
-
-        headless: true,
-
-        actionTimeout: 10_000,
-
-        navigationTimeout: 15_000,
-
-        screenshot: 'only-on-failure',
-
-        video: 'retain-on-failure',
-
-        trace: 'retain-on-failure'
+      dependencies: ['setup'],
     },
 
-    projects: [
-        {
-            name: 'setup',
-            testMatch: /.*\.setup\.js/
-        },
+    {
+      name: 'unauthenticated',
 
-        {
-            name: 'chromium',
-            testIgnore: [
-                '**/login.spec.js',
-                '**/landing.spec.js',
-                '**/api/**',
-            ],
-            use: {
-                browserName: 'chromium',
-                storageState: 'playwright/.auth/user.json'
-            },
-            dependencies: ['setup']
-        },
+      testMatch: [
+        '**/login.spec.js',
+        '**/landing.spec.js',
+      ],
 
-        {
-            name: 'unauthenticated',
-            testMatch: [
-                '**/login.spec.js',
-                '**/landing.spec.js'
-            ],
-            use: {
-                browserName: 'chromium',
-                storageState: undefined
-            }
-        },
+      use: {
+        browserName: 'chromium',
+        storageState: undefined,
+      },
+    },
 
-        {
-            name: 'api',
-            testMatch: /api\/specs\/.*\.spec\.js/,
-            use: {
-                baseURL: process.env.BACKEND_URL || 'http://localhost:5000',
-            },
-        },
+    {
+      name: 'api',
 
-        {
-            name: 'api',
-            testMatch: /api\/specs\/.*\.spec\.js/,
-            use: {
-                baseURL: process.env.BACKEND_URL || 'http://localhost:5000',
-            },
-        },
-    ],
+      testMatch: /api\/specs\/.*\.spec\.js/,
+
+      use: {
+        baseURL: process.env.BACKEND_URL || 'http://localhost:5000',
+      },
+    },
+  ],
 });

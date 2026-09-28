@@ -3,6 +3,8 @@ node_modules/
 .env.*
 !.env.example
 playwright-report/
+.next/
+frontend/.next/
 test-results/
 reports/generated/
 artifacts/generated/
@@ -10,3 +12,4 @@ coverage/
 .DS_Store
 *.log
 playwright/.auth/
+reports/playwright-results.json
