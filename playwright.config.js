@@ -76,13 +76,17 @@ export default defineConfig({
 
   use: {
     baseURL: process.env.FRONTEND_URL || 'https://usecati.com',
+
     headless: true,
 
     actionTimeout: 10_000,
+
     navigationTimeout: 15_000,
 
     screenshot: 'only-on-failure',
+
     video: 'retain-on-failure',
+
     trace: 'retain-on-failure',
   },
 
