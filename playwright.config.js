@@ -4,6 +4,8 @@ import 'dotenv/config';
 export default defineConfig({
   testDir: './test-engine',
 
+  workers: Number(process.env.PLAYWRIGHT_WORKERS || 1),
+
   timeout: 30_000,
 
   expect: {
