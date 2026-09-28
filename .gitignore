@@ -3,6 +3,8 @@ node_modules/
 .env.*
 !.env.example
 playwright-report/
+.next/
+frontend/.next/
 test-results/
 reports/generated/
 artifacts/generated/
