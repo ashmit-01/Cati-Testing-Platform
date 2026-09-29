@@ -2,7 +2,13 @@ import { test as setup, expect } from '@playwright/test';
 import path from 'path';
 import fs from 'fs';
 
+
 setup.setTimeout(90_000);
+
+console.log("🔥 AUTH SETUP STARTED");
+console.log("FRONTEND_URL =", process.env.FRONTEND_URL);
+console.log("TEST_EMAIL =", !!process.env.TEST_EMAIL);
+console.log("TEST_PASSWORD =", !!process.env.TEST_PASSWORD);
 
 const authDir = path.join(process.cwd(), 'playwright', '.auth');
 const authFile = path.join(authDir, 'user.json');
