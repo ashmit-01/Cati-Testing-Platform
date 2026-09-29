@@ -1,38 +1,71 @@
 import { spawn } from 'child_process';
-import { readdir, readFile, mkdtemp, rm } from 'fs/promises';
+import {
+    readdir,
+    readFile,
+    mkdtemp,
+    rm
+} from 'fs/promises';
 import path from 'path';
 import os from 'os';
-import { fileURLToPath } from 'url';
+import {
+    fileURLToPath
+} from 'url';
 
 import { logger } from '../utils/logger.js';
 import TestCase from '../models/TestCase.js';
 import { checkResult } from './resultCheckerService.js';
-import { executeTestCaseWithPlaywright } from './playwrightCaseExecutor.js';
+import {
+    executeTestCaseWithPlaywright
+} from './playwrightCaseExecutor.js';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const __dirname = path.dirname(
+    fileURLToPath(import.meta.url)
+);
 
-const REPO_ROOT = path.resolve(__dirname, '..', '..');
+// backend/services -> repo root
+const REPO_ROOT = path.resolve(
+    __dirname,
+    '..',
+    '..'
+);
+
+// ---------------------------------------------------------
+// TIMEOUT CONFIGURATION
+// ---------------------------------------------------------
 
 const PLAYWRIGHT_TIMEOUT_MS = Number(
     process.env.PLAYWRIGHT_TIMEOUT_MS || 60000
 );
 
 const SPEC_TIMEOUT_MS = Number(
-    process.env.PLAYWRIGHT_SPEC_TIMEOUT_MS || 45000
+    process.env.PLAYWRIGHT_SPEC_TIMEOUT_MS || 600000
 );
+
+// ---------------------------------------------------------
+// SUITE CONFIGURATION
+// ---------------------------------------------------------
 
 const SUITE_DIRS = Object.freeze({
     API: 'test-engine/api',
     UI: 'test-engine/ui',
     E2E: 'test-engine/e2e',
+
+    // AI + WebSocket integration
     WEBSOCKET: 'test-engine/websocket',
     AI_VOICE: 'test-engine/ai'
 });
 
 const ALL_SUITES = Object.keys(SUITE_DIRS);
 
+// ---------------------------------------------------------
+// SUITE HELPERS
+// ---------------------------------------------------------
+
 function resolveSuites(requestedSuites) {
-    if (!requestedSuites || requestedSuites.length === 0) {
+    if (
+        !requestedSuites ||
+        requestedSuites.length === 0
+    ) {
         return ALL_SUITES;
     }
 
@@ -41,18 +74,31 @@ function resolveSuites(requestedSuites) {
         .filter((suite) => SUITE_DIRS[suite]);
 }
 
+// ---------------------------------------------------------
+// FIND PLAYWRIGHT SPEC FILES
+// ---------------------------------------------------------
+
 async function findSpecFiles(relativeDir) {
-    const absoluteDir = path.join(REPO_ROOT, relativeDir);
+    const absoluteDir = path.join(
+        REPO_ROOT,
+        relativeDir
+    );
 
     try {
-        logger.info('Looking for Playwright specs', {
-            relativeDir,
-            absoluteDir
-        });
+        logger.info(
+            'Looking for Playwright specs',
+            {
+                relativeDir,
+                absoluteDir
+            }
+        );
 
-        const entries = await readdir(absoluteDir, {
-            withFileTypes: true
-        });
+        const entries = await readdir(
+            absoluteDir,
+            {
+                withFileTypes: true
+            }
+        );
 
         const files = entries
             .filter(
@@ -60,15 +106,22 @@ async function findSpecFiles(relativeDir) {
                     entry.isFile() &&
                     entry.name.endsWith('.spec.js')
             )
-            .map((entry) =>
-                path.join(relativeDir, entry.name)
+            .map(
+                (entry) =>
+                    path.join(
+                        relativeDir,
+                        entry.name
+                    )
             );
 
-        logger.info('Playwright spec discovery completed', {
-            relativeDir,
-            count: files.length,
-            files
-        });
+        logger.info(
+            'Playwright spec discovery completed',
+            {
+                relativeDir,
+                count: files.length,
+                files
+            }
+        );
 
         return files;
     } catch (error) {
@@ -85,12 +138,20 @@ async function findSpecFiles(relativeDir) {
     }
 }
 
+// ---------------------------------------------------------
+// SLUGIFY
+// ---------------------------------------------------------
+
 function slugify(text) {
     return String(text)
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, '-')
         .replace(/(^-|-$)/g, '');
 }
+
+// ---------------------------------------------------------
+// PLAYWRIGHT RESULT STATUS
+// ---------------------------------------------------------
 
 function mapPlaywrightStatus(status) {
     if (status === 'passed') {
@@ -108,10 +169,21 @@ function mapPlaywrightStatus(status) {
     return 'SKIPPED';
 }
 
-function parsePlaywrightJson(json, suite, specFile) {
+// ---------------------------------------------------------
+// PARSE PLAYWRIGHT JSON
+// ---------------------------------------------------------
+
+function parsePlaywrightJson(
+    json,
+    suite,
+    specFile
+) {
     const results = [];
 
-    function walkSuite(node, filePath) {
+    function walkSuite(
+        node,
+        filePath
+    ) {
         if (node.specs) {
             for (const spec of node.specs) {
                 for (const test of spec.tests || []) {
@@ -120,10 +192,11 @@ function parsePlaywrightJson(json, suite, specFile) {
                             test.results.length - 1
                         ];
 
-                    const status = mapPlaywrightStatus(
-                        lastResult?.status ||
-                        test.status
-                    );
+                    const status =
+                        mapPlaywrightStatus(
+                            lastResult?.status ||
+                            test.status
+                        );
 
                     const errorMessage =
                         lastResult?.error?.message ||
@@ -135,20 +208,23 @@ function parsePlaywrightJson(json, suite, specFile) {
 
                     const screenshot =
                         attachments.find(
-                            (a) =>
-                                a.name === 'screenshot'
+                            (attachment) =>
+                                attachment.name ===
+                                'screenshot'
                         )?.path || null;
 
                     const trace =
                         attachments.find(
-                            (a) =>
-                                a.name === 'trace'
+                            (attachment) =>
+                                attachment.name ===
+                                'trace'
                         )?.path || null;
 
                     const video =
                         attachments.find(
-                            (a) =>
-                                a.name === 'video'
+                            (attachment) =>
+                                attachment.name ===
+                                'video'
                         )?.path || null;
 
                     results.push({
@@ -205,40 +281,57 @@ function parsePlaywrightJson(json, suite, specFile) {
     return results;
 }
 
-function buildSummary(results, duration) {
+// ---------------------------------------------------------
+// BUILD SUMMARY
+// ---------------------------------------------------------
+
+function buildSummary(
+    results,
+    duration
+) {
     const safeResults =
         Array.isArray(results)
             ? results
             : [];
 
-    const summary = safeResults.reduce(
-        (acc, result) => {
-            acc.totalTests += 1;
+    const summary =
+        safeResults.reduce(
+            (acc, result) => {
+                acc.totalTests += 1;
 
-            if (result.status === 'PASS') {
-                acc.passed += 1;
-            } else if (result.status === 'FAIL') {
-                acc.failed += 1;
-            } else {
-                acc.skipped += 1;
+                if (
+                    result.status === 'PASS'
+                ) {
+                    acc.passed += 1;
+                } else if (
+                    result.status === 'FAIL'
+                ) {
+                    acc.failed += 1;
+                } else {
+                    acc.skipped += 1;
+                }
+
+                return acc;
+            },
+            {
+                totalTests: 0,
+                passed: 0,
+                failed: 0,
+                skipped: 0
             }
-
-            return acc;
-        },
-        {
-            totalTests: 0,
-            passed: 0,
-            failed: 0,
-            skipped: 0
-        }
-    );
+        );
 
     return {
         ...summary,
-        duration: Number(duration) || 0,
+        duration:
+            Number(duration) || 0,
         results: safeResults
     };
 }
+
+// ---------------------------------------------------------
+// KILL PLAYWRIGHT PROCESS TREE
+// ---------------------------------------------------------
 
 function killProcessTree(child) {
     if (!child || !child.pid) {
@@ -290,11 +383,14 @@ function killProcessTree(child) {
     }
 }
 
-/**
- * Run ONE Playwright spec file.
- *
- * This is the key reliability fix.
- */
+// =========================================================
+// REAL PLAYWRIGHT EXECUTION
+// =========================================================
+
+// ---------------------------------------------------------
+// RUN ONE SPEC FILE
+// ---------------------------------------------------------
+
 async function runSinglePlaywrightSpec({
     suite,
     environment,
@@ -320,7 +416,8 @@ async function runSinglePlaywrightSpec({
             suite,
             specFile,
             environment,
-            timeoutMs: SPEC_TIMEOUT_MS
+            timeoutMs:
+                SPEC_TIMEOUT_MS
         }
     );
 
@@ -332,15 +429,35 @@ async function runSinglePlaywrightSpec({
                         ? 'npx.cmd'
                         : 'npx';
 
+                /*
+                 * IMPORTANT:
+                 *
+                 * This specFile MUST be included here.
+                 *
+                 * Previously the runner created `args`
+                 * containing specFile but then ignored `args`
+                 * and launched the whole Playwright suite.
+                 *
+                 * That is what caused:
+                 *
+                 * agents.spec.js
+                 *      -> Running 41 tests
+                 *
+                 * bulk-calling.spec.js
+                 *      -> Running 41 tests
+                 *
+                 * calls.spec.js
+                 *      -> Running 41 tests
+                 */
                 const args = [
-    'playwright',
-    'test',
-    specFile,
-    '--project=chromium',
-    '--reporter=json',
-    '--workers=1',
-    '--timeout=30000'
-];
+                    'playwright',
+                    'test',
+                    specFile,
+                    '--project=chromium',
+                    '--reporter=json',
+                    '--workers=1',
+                    '--timeout=30000'
+                ];
 
                 logger.info(
                     'Launching individual Playwright spec',
@@ -353,78 +470,78 @@ async function runSinglePlaywrightSpec({
                     }
                 );
 
-               const child = spawn(
-    command,
-    [
-        'playwright',
-        'test',
-        '--project=chromium',
-        '--project=unauthenticated',
-        '--reporter=json'
-    ],
-    {
-        cwd: REPO_ROOT,
+                const child = spawn(
+                    command,
+                    args,
+                    {
+                        cwd: REPO_ROOT,
 
-        env: {
-            ...process.env,
+                        env: {
+                            ...process.env,
 
-            CI: 'true',
+                            CI: 'true',
 
-            TEST_ENV:
-                environment,
+                            TEST_ENV:
+                                environment,
 
-            PLAYWRIGHT_JSON_OUTPUT_FILE:
-                outputFile,
+                            PLAYWRIGHT_JSON_OUTPUT_FILE:
+                                outputFile,
 
-            PLAYWRIGHT_BROWSERS_PATH:
-                process.env.PLAYWRIGHT_BROWSERS_PATH ||
-                '0'
-        },
+                            PLAYWRIGHT_BROWSERS_PATH:
+                                process.env
+                                    .PLAYWRIGHT_BROWSERS_PATH ||
+                                '0'
+                        },
 
-        detached:
-            process.platform !== 'win32',
+                        detached:
+                            process.platform !==
+                            'win32',
 
-        windowsHide: true
-    }
-);
+                        windowsHide: true
+                    }
+                );
+
                 let stdout = '';
                 let stderr = '';
                 let settled = false;
 
-                const timeout = setTimeout(
-                    () => {
-                        if (settled) {
-                            return;
-                        }
-
-                        settled = true;
-
-                        logger.error(
-                            'Individual Playwright spec timed out',
-                            {
-                                suite,
-                                specFile,
-                                timeoutMs:
-                                    SPEC_TIMEOUT_MS,
-                                pid:
-                                    child.pid,
-                                stdout,
-                                stderr
+                const timeout =
+                    setTimeout(
+                        () => {
+                            if (settled) {
+                                return;
                             }
-                        );
 
-                        killProcessTree(child);
+                            settled = true;
 
-                        reject(
-                            new Error(
-                                `Playwright spec "${specFile}" ` +
-                                `timed out after ` +
-                                `${SPEC_TIMEOUT_MS} ms`
-                            )
-                        );
-                    },
-                    SPEC_TIMEOUT_MS
-                );
+                            logger.error(
+                                'Individual Playwright spec timed out',
+                                {
+                                    suite,
+                                    specFile,
+                                    timeoutMs:
+                                        SPEC_TIMEOUT_MS,
+                                    pid:
+                                        child.pid,
+                                    stdout,
+                                    stderr
+                                }
+                            );
+
+                            killProcessTree(
+                                child
+                            );
+
+                            reject(
+                                new Error(
+                                    `Playwright spec "${specFile}" ` +
+                                    `timed out after ` +
+                                    `${SPEC_TIMEOUT_MS} ms`
+                                )
+                            );
+                        },
+                        SPEC_TIMEOUT_MS
+                    );
 
                 child.stdout?.on(
                     'data',
@@ -440,7 +557,9 @@ async function runSinglePlaywrightSpec({
                                 suite,
                                 specFile,
                                 bytes:
-                                    Buffer.byteLength(text)
+                                    Buffer.byteLength(
+                                        text
+                                    )
                             }
                         );
                     }
@@ -459,7 +578,8 @@ async function runSinglePlaywrightSpec({
                             {
                                 suite,
                                 specFile,
-                                message: text.trim()
+                                message:
+                                    text.trim()
                             }
                         );
                     }
@@ -474,7 +594,9 @@ async function runSinglePlaywrightSpec({
 
                         settled = true;
 
-                        clearTimeout(timeout);
+                        clearTimeout(
+                            timeout
+                        );
 
                         reject(error);
                     }
@@ -489,7 +611,9 @@ async function runSinglePlaywrightSpec({
 
                         settled = true;
 
-                        clearTimeout(timeout);
+                        clearTimeout(
+                            timeout
+                        );
 
                         logger.info(
                             'Playwright spec process closed',
@@ -506,19 +630,21 @@ async function runSinglePlaywrightSpec({
                         );
 
                         /*
-                         * IMPORTANT:
-                         *
                          * A non-zero Playwright exit code
-                         * means tests failed.
+                         * normally means one or more tests failed.
                          *
-                         * It does NOT mean the runner itself
-                         * failed.
+                         * The process itself completed correctly,
+                         * so we still parse the JSON report.
                          */
                         resolve();
                     }
                 );
             }
         );
+
+        // -------------------------------------------------
+        // READ JSON REPORT
+        // -------------------------------------------------
 
         let raw;
 
@@ -541,7 +667,9 @@ async function runSinglePlaywrightSpec({
             return [
                 {
                     testName:
-                        `${path.basename(specFile)} execution`,
+                        `${path.basename(
+                            specFile
+                        )} execution`,
 
                     suite,
 
@@ -569,6 +697,10 @@ async function runSinglePlaywrightSpec({
             ];
         }
 
+        // -------------------------------------------------
+        // PARSE JSON
+        // -------------------------------------------------
+
         let json;
 
         try {
@@ -587,7 +719,9 @@ async function runSinglePlaywrightSpec({
             return [
                 {
                     testName:
-                        `${path.basename(specFile)} execution`,
+                        `${path.basename(
+                            specFile
+                        )} execution`,
 
                     suite,
 
@@ -625,7 +759,9 @@ async function runSinglePlaywrightSpec({
             return [
                 {
                     testName:
-                        `${path.basename(specFile)} execution`,
+                        `${path.basename(
+                            specFile
+                        )} execution`,
 
                     suite,
 
@@ -659,26 +795,31 @@ async function runSinglePlaywrightSpec({
                 specFile,
                 tests:
                     results.length,
+
                 passed:
                     results.filter(
-                        (r) =>
-                            r.status === 'PASS'
+                        (result) =>
+                            result.status ===
+                            'PASS'
                     ).length,
+
                 failed:
                     results.filter(
-                        (r) =>
-                            r.status === 'FAIL'
+                        (result) =>
+                            result.status ===
+                            'FAIL'
                     ).length,
+
                 skipped:
                     results.filter(
-                        (r) =>
-                            r.status === 'SKIPPED'
+                        (result) =>
+                            result.status ===
+                            'SKIPPED'
                     ).length
             }
         );
 
         return results;
-
     } catch (error) {
         logger.error(
             'Individual Playwright spec failed',
@@ -695,7 +836,9 @@ async function runSinglePlaywrightSpec({
         return [
             {
                 testName:
-                    `${path.basename(specFile)} execution`,
+                    `${path.basename(
+                        specFile
+                    )} execution`,
 
                 suite,
 
@@ -730,47 +873,58 @@ async function runSinglePlaywrightSpec({
     }
 }
 
-/**
- * Run an entire Playwright suite.
- *
- * Each spec gets its own process.
- */
+// ---------------------------------------------------------
+// RUN ONE SUITE
+// ---------------------------------------------------------
+
 async function runPlaywrightForSuite({
     suite,
     environment
 }) {
-    const dir = SUITE_DIRS[suite];
+    const dir =
+        SUITE_DIRS[suite];
 
     const specFiles =
         await findSpecFiles(dir);
 
     if (specFiles.length === 0) {
-        return [
+        logger.warn(
+            'No Playwright spec files found',
             {
-                testName:
-                    `${suite} suite`,
-
                 suite,
-
-                status: 'SKIPPED',
-
-                duration: 0,
-
-                error:
-                    `No Playwright spec files found ` +
-                    `under ${dir}.`,
-
-                expected: null,
-
-                actual: null,
-
-                endpoint: null,
-
-                page: null,
-
-                evidence: {}
+                dir
             }
-        ];
+        );
+
+        return buildSummary(
+            [
+                {
+                    testName:
+                        `${suite} suite`,
+
+                    suite,
+
+                    status: 'SKIPPED',
+
+                    duration: 0,
+
+                    error:
+                        `No Playwright spec files found ` +
+                        `under ${dir}.`,
+
+                    expected: null,
+
+                    actual: null,
+
+                    endpoint: null,
+
+                    page: null,
+
+                    evidence: {}
+                }
+            ],
+            0
+        );
     }
 
     logger.info(
@@ -790,15 +944,18 @@ async function runPlaywrightForSuite({
     /*
      * Sequential execution.
      *
-     * If one spec hangs/fails, the rest still run.
+     * If one spec fails/times out,
+     * the next spec still runs.
      */
     for (const specFile of specFiles) {
         const specResults =
-            await runSinglePlaywrightSpec({
-                suite,
-                environment,
-                specFile
-            });
+            await runSinglePlaywrightSpec(
+                {
+                    suite,
+                    environment,
+                    specFile
+                }
+            );
 
         results.push(
             ...specResults
@@ -807,9 +964,14 @@ async function runPlaywrightForSuite({
 
     return buildSummary(
         results,
-        Date.now() - startedAt
+        Date.now() -
+            startedAt
     );
 }
+
+// ---------------------------------------------------------
+// RUN ALL PLAYWRIGHT SUITES
+// ---------------------------------------------------------
 
 async function runPlaywright({
     environment,
@@ -838,15 +1000,16 @@ async function runPlaywright({
             );
 
             const suiteOutcome =
-                await runPlaywrightForSuite({
-                    suite,
-                    environment
-                });
+                await runPlaywrightForSuite(
+                    {
+                        suite,
+                        environment
+                    }
+                );
 
             results.push(
                 ...(suiteOutcome.results || [])
             );
-
         } catch (error) {
             logger.error(
                 'Suite execution failed',
@@ -885,15 +1048,22 @@ async function runPlaywright({
 
     return buildSummary(
         results,
-        Date.now() - startedAt
+        Date.now() -
+            startedAt
     );
 }
 
-/* ---------------------------------------------------------
- * MOCK MODE
- * --------------------------------------------------------- */
+// =========================================================
+// MOCK EXECUTION
+// =========================================================
 
-async function extractTestNames(specFilePath) {
+// ---------------------------------------------------------
+// EXTRACT TEST NAMES
+// ---------------------------------------------------------
+
+async function extractTestNames(
+    specFilePath
+) {
     try {
         const content =
             await readFile(
@@ -917,6 +1087,10 @@ async function extractTestNames(specFilePath) {
         return [];
     }
 }
+
+// ---------------------------------------------------------
+// MOCK FAILURE REASONS
+// ---------------------------------------------------------
 
 const MOCK_FAIL_REASONS_BY_SUITE = {
     API: [
@@ -947,6 +1121,10 @@ const MOCK_FAIL_REASONS_BY_SUITE = {
     ]
 };
 
+// ---------------------------------------------------------
+// MOCK STATUS
+// ---------------------------------------------------------
+
 function weightedRandomStatus() {
     const roll = Math.random();
 
@@ -960,6 +1138,10 @@ function weightedRandomStatus() {
 
     return 'SKIPPED';
 }
+
+// ---------------------------------------------------------
+// GENERATE MOCK RESULTS
+// ---------------------------------------------------------
 
 async function generateMockResultsForSuite(
     suite,
@@ -978,7 +1160,9 @@ async function generateMockResultsForSuite(
                 specFile
             );
 
-        testNames.push(...names);
+        testNames.push(
+            ...names
+        );
     }
 
     if (testNames.length === 0) {
@@ -1000,21 +1184,30 @@ async function generateMockResultsForSuite(
 
             const result = {
                 testName,
+
                 suite,
+
                 status,
+
                 duration,
+
                 error: null,
+
                 expected: null,
+
                 actual: null,
+
                 endpoint:
                     suite === 'API'
                         ? '/api/mock-endpoint'
                         : null,
+
                 page:
                     suite === 'UI' ||
                     suite === 'E2E'
                         ? '/mock-page'
                         : null,
+
                 evidence: {}
             };
 
@@ -1022,8 +1215,9 @@ async function generateMockResultsForSuite(
                 const reasons =
                     MOCK_FAIL_REASONS_BY_SUITE[
                         suite
-                    ] ||
-                    ['Unexpected failure'];
+                    ] || [
+                        'Unexpected failure'
+                    ];
 
                 result.error =
                     reasons[
@@ -1042,11 +1236,15 @@ async function generateMockResultsForSuite(
                 result.evidence = {
                     screenshot:
                         `artifacts/${runId}/` +
-                        `${slugify(testName)}.png`,
+                        `${slugify(
+                            testName
+                        )}.png`,
 
                     trace:
                         `artifacts/${runId}/` +
-                        `${slugify(testName)}.zip`,
+                        `${slugify(
+                            testName
+                        )}.zip`,
 
                     video: null
                 };
@@ -1057,11 +1255,16 @@ async function generateMockResultsForSuite(
     );
 }
 
+// ---------------------------------------------------------
+// RUN MOCK
+// ---------------------------------------------------------
+
 async function runMock({
     runId,
     suites
 }) {
-    const startedAt = Date.now();
+    const startedAt =
+        Date.now();
 
     const results = [];
 
@@ -1079,13 +1282,18 @@ async function runMock({
 
     return buildSummary(
         results,
-        Date.now() - startedAt
+        Date.now() -
+            startedAt
     );
 }
 
-/* ---------------------------------------------------------
- * STORED TEST CASES
- * --------------------------------------------------------- */
+// =========================================================
+// STORED TEST CASE EXECUTION
+// =========================================================
+
+// ---------------------------------------------------------
+// RESOLVE TEST CASES
+// ---------------------------------------------------------
 
 async function resolveTestCases({
     suiteId,
@@ -1095,23 +1303,31 @@ async function resolveTestCases({
         testCaseIds &&
         testCaseIds.length > 0
     ) {
-        return TestCase.find({
-            _id: {
-                $in: testCaseIds
-            },
-            active: true
-        }).lean();
+        return TestCase.find(
+            {
+                _id: {
+                    $in: testCaseIds
+                },
+                active: true
+            }
+        ).lean();
     }
 
     if (suiteId) {
-        return TestCase.find({
-            suiteId,
-            active: true
-        }).lean();
+        return TestCase.find(
+            {
+                suiteId,
+                active: true
+            }
+        ).lean();
     }
 
     return [];
 }
+
+// ---------------------------------------------------------
+// MOCK STORED TEST CASE
+// ---------------------------------------------------------
 
 function runTestCaseMock(
     testCase,
@@ -1170,11 +1386,15 @@ function runTestCaseMock(
         result.evidence = {
             screenshot:
                 `artifacts/${runId}/` +
-                `${slugify(testCase.testCaseId)}.png`,
+                `${slugify(
+                    testCase.testCaseId
+                )}.png`,
 
             trace:
                 `artifacts/${runId}/` +
-                `${slugify(testCase.testCaseId)}.zip`,
+                `${slugify(
+                    testCase.testCaseId
+                )}.zip`,
 
             video: null
         };
@@ -1182,6 +1402,10 @@ function runTestCaseMock(
 
     return result;
 }
+
+// ---------------------------------------------------------
+// STORED TEST CASE PLACEHOLDER
+// ---------------------------------------------------------
 
 function runTestCasePlaceholder(
     testCase
@@ -1216,19 +1440,37 @@ function runTestCasePlaceholder(
     };
 }
 
+// ---------------------------------------------------------
+// RUN STORED TEST CASES
+// ---------------------------------------------------------
+
 async function runStoredTestCases({
     runId,
     environment,
     suiteId,
     testCaseIds
 }) {
-    const startedAt = Date.now();
+    const startedAt =
+        Date.now();
 
     const testCases =
-        await resolveTestCases({
-            suiteId,
-            testCaseIds
-        });
+        await resolveTestCases(
+            {
+                suiteId,
+                testCaseIds
+            }
+        );
+
+    if (testCases.length === 0) {
+        logger.warn(
+            'No matching active test cases found',
+            {
+                runId,
+                suiteId,
+                testCaseIds
+            }
+        );
+    }
 
     const mode =
         (
@@ -1268,8 +1510,10 @@ async function runStoredTestCases({
                 'Stored test case execution failed',
                 {
                     runId,
+
                     testCaseId:
                         testCase._id,
+
                     message:
                         error.message
                 }
@@ -1308,13 +1552,14 @@ async function runStoredTestCases({
 
     return buildSummary(
         results,
-        Date.now() - startedAt
+        Date.now() -
+            startedAt
     );
 }
 
-/* ---------------------------------------------------------
- * PUBLIC ENTRY POINT
- * --------------------------------------------------------- */
+// =========================================================
+// PUBLIC ENTRY POINT
+// =========================================================
 
 export async function runTests({
     runId,
@@ -1338,23 +1583,35 @@ export async function runTests({
             )
         );
 
+    const resolvedSuites =
+        resolveSuites(suites);
+
     logger.info(
         'Starting test execution',
         {
             runId,
+
             environment,
+
             mode,
+
             dbDriven,
+
             suites:
                 dbDriven
                     ? undefined
-                    : resolveSuites(suites),
+                    : resolvedSuites,
+
             suiteId,
+
             testCaseIds,
+
             playwrightTimeoutMs:
                 PLAYWRIGHT_TIMEOUT_MS,
+
             specTimeoutMs:
                 SPEC_TIMEOUT_MS,
+
             repoRoot:
                 REPO_ROOT
         }
@@ -1362,42 +1619,69 @@ export async function runTests({
 
     let outcome;
 
+    // -----------------------------------------------------
+    // DATABASE-DRIVEN EXECUTION
+    // -----------------------------------------------------
+
     if (dbDriven) {
         outcome =
-            await runStoredTestCases({
-                runId,
-                environment,
-                suiteId,
-                testCaseIds
-            });
-    } else if (mode === 'mock') {
+            await runStoredTestCases(
+                {
+                    runId,
+                    environment,
+                    suiteId,
+                    testCaseIds
+                }
+            );
+    }
+
+    // -----------------------------------------------------
+    // MOCK EXECUTION
+    // -----------------------------------------------------
+
+    else if (mode === 'mock') {
         outcome =
-            await runMock({
-                runId,
-                suites:
-                    resolveSuites(suites)
-            });
-    } else {
+            await runMock(
+                {
+                    runId,
+                    suites:
+                        resolvedSuites
+                }
+            );
+    }
+
+    // -----------------------------------------------------
+    // REAL PLAYWRIGHT EXECUTION
+    // -----------------------------------------------------
+
+    else {
         outcome =
-            await runPlaywright({
-                environment,
-                suites:
-                    resolveSuites(suites)
-            });
+            await runPlaywright(
+                {
+                    environment,
+                    suites:
+                        resolvedSuites
+                }
+            );
     }
 
     logger.info(
         'Test execution finished',
         {
             runId,
+
             totalTests:
                 outcome.totalTests,
+
             passed:
                 outcome.passed,
+
             failed:
                 outcome.failed,
+
             skipped:
                 outcome.skipped,
+
             duration:
                 outcome.duration
         }
@@ -1405,6 +1689,10 @@ export async function runTests({
 
     return outcome;
 }
+
+// =========================================================
+// AVAILABLE SUITES
+// =========================================================
 
 export const AVAILABLE_SUITES =
     ALL_SUITES;
