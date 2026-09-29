@@ -333,17 +333,14 @@ async function runSinglePlaywrightSpec({
                         : 'npx';
 
                 const args = [
-                    '--no-install',
-                    'playwright',
-                    'test',
-                    specFile,
-
-                    '--reporter=json',
-
-                    '--workers=1',
-
-                    '--timeout=30000'
-                ];
+    'playwright',
+    'test',
+    specFile,
+    '--project=chromium',
+    '--reporter=json',
+    '--workers=1',
+    '--timeout=30000'
+];
 
                 logger.info(
                     'Launching individual Playwright spec',
