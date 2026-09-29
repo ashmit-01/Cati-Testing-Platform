@@ -7,35 +7,142 @@ import { processResults } from '../services/resultService.js';
 import { processFailures } from '../services/failureService.js';
 import { logger } from '../utils/logger.js';
 
-/**
- * Runs the full test execution pipeline in the background and updates the
- * TestRun document when it finishes. Intentionally not awaited by the
- * request handler — POST /api/test-runs must return immediately.
- */
-async function executeInBackground(runId, environment, { suites, suiteId, testCaseIds }) {
-    try {
-        const outcome = await runTests({ runId, environment, suites, suiteId, testCaseIds });
 
-        const { savedResults } = await processResults(runId, outcome.results, environment);
-        await processFailures(savedResults, runId);
+/**
+ * Normalize a TestRun document before sending it to the frontend.
+ *
+ * This keeps the frontend independent from MongoDB field names.
+ */
+function normalizeRun(run) {
+    if (!run) {
+        return null;
+    }
+
+    return {
+        id: run.runId,
+        runId: run.runId,
+
+        mongoId: run._id,
+
+        environment: run.environment,
+
+        suites: run.suites || [],
+        suiteId: run.suiteId || null,
+        testCaseIds: run.testCaseIds || [],
+
+        status: run.status,
+
+        startedAt: run.startedAt,
+        completedAt: run.completedAt || null,
+
+        date: run.startedAt,
+
+        totalTests: run.totalTests || 0,
+        total: run.totalTests || 0,
+
+        passed: run.passed || 0,
+        passedTests: run.passed || 0,
+
+        failed: run.failed || 0,
+        failedTests: run.failed || 0,
+
+        skipped: run.skipped || 0,
+        skippedTests: run.skipped || 0,
+
+        duration: run.duration || 0,
+
+        executionMode: run.executionMode || 'unknown',
+
+        error: run.error || null
+    };
+}
+
+
+/**
+ * Runs the full test execution pipeline.
+ *
+ * IMPORTANT:
+ * This is currently executed in the background.
+ * For local development this is fine.
+ *
+ * For production/serverless deployment, this should eventually
+ * be moved to a real worker/queue system.
+ */
+async function executeInBackground(
+    runId,
+    environment,
+    { suites, suiteId, testCaseIds }
+) {
+    try {
+        logger.info('Starting background test execution', {
+            runId,
+            environment,
+            suites,
+            suiteId,
+            testCaseIds
+        });
+
+        const outcome = await runTests({
+            runId,
+            environment,
+            suites,
+            suiteId,
+            testCaseIds
+        });
+
+        logger.info('Test execution finished', {
+            runId,
+            totalTests: outcome.totalTests,
+            passed: outcome.passed,
+            failed: outcome.failed,
+            skipped: outcome.skipped,
+            duration: outcome.duration
+        });
+
+        const { savedResults } = await processResults(
+            runId,
+            outcome.results,
+            environment
+        );
+
+        await processFailures(
+            savedResults,
+            runId
+        );
 
         await TestRun.findOneAndUpdate(
             { runId },
             {
                 status: TEST_RUN_STATUS.COMPLETED,
                 completedAt: new Date(),
-                totalTests: outcome.totalTests,
-                passed: outcome.passed,
-                failed: outcome.failed,
-                skipped: outcome.skipped,
-                duration: outcome.duration,
-                executionMode: (process.env.TEST_EXECUTION_MODE || 'mock').toLowerCase()
+
+                totalTests: outcome.totalTests || 0,
+                passed: outcome.passed || 0,
+                failed: outcome.failed || 0,
+                skipped: outcome.skipped || 0,
+
+                duration: outcome.duration || 0,
+
+                executionMode: (
+                    process.env.TEST_EXECUTION_MODE || 'mock'
+                ).toLowerCase()
             }
         );
 
-        logger.info('Test run completed', { runId, ...outcome, results: undefined });
+        logger.info('Test run completed successfully', {
+            runId
+        });
+
     } catch (err) {
-        logger.error('Test run failed unexpectedly', { runId, message: err.message });
+
+        logger.error(
+            'Test run failed unexpectedly',
+            {
+                runId,
+                message: err.message,
+                stack: err.stack
+            }
+        );
 
         await TestRun.findOneAndUpdate(
             { runId },
@@ -45,100 +152,233 @@ async function executeInBackground(runId, environment, { suites, suiteId, testCa
                 error: err.message
             }
         ).catch((updateErr) => {
-            // If we can't even record the failure, log loudly — this run
-            // would otherwise be stuck in RUNNING forever.
-            logger.error('Could not mark test run as FAILED after an error', {
-                runId,
-                message: updateErr.message
-            });
+
+            logger.error(
+                'Could not mark test run as FAILED',
+                {
+                    runId,
+                    message: updateErr.message
+                }
+            );
+
         });
     }
 }
 
+
 /**
  * POST /api/test-runs
- * Creates a TestRun (status RUNNING) and immediately returns. Test
- * execution continues in the background.
+ *
+ * Creates a new test run.
  */
-export const createTestRun = asyncHandler(async (req, res) => {
-    const { environment, suites, suiteId, testCaseIds } = req.body;
+export const createTestRun = asyncHandler(
+    async (req, res) => {
 
-    const runId = await generateRunId();
+        const {
+            environment,
+            suites,
+            suiteId,
+            testCaseIds
+        } = req.body;
 
-    const testRun = await TestRun.create({
-        runId,
-        environment,
-        suites: suites ? suites.map((suite) => suite.toUpperCase()) : [],
-        suiteId: suiteId || null,
-        testCaseIds: testCaseIds || [],
-        status: TEST_RUN_STATUS.RUNNING,
-        startedAt: new Date()
-    });
+        const runId = await generateRunId();
 
-    // Fire-and-forget: do not await. Errors are handled inside
-    // executeInBackground so they can never become an unhandled rejection.
-    executeInBackground(runId, environment, {
-        suites: testRun.suites,
-        suiteId: testRun.suiteId,
-        testCaseIds: testRun.testCaseIds
-    }).catch((err) => {
-        logger.error('Unexpected error launching background test execution', {
+        const testRun = await TestRun.create({
             runId,
-            message: err.message
+
+            environment,
+
+            suites: Array.isArray(suites)
+                ? suites.map((suite) =>
+                    String(suite).toUpperCase()
+                )
+                : [],
+
+            suiteId: suiteId || null,
+
+            testCaseIds: Array.isArray(testCaseIds)
+                ? testCaseIds
+                : [],
+
+            status: TEST_RUN_STATUS.RUNNING,
+
+            startedAt: new Date(),
+
+            totalTests: 0,
+            passed: 0,
+            failed: 0,
+            skipped: 0,
+
+            duration: 0,
+
+            executionMode: (
+                process.env.TEST_EXECUTION_MODE || 'mock'
+            ).toLowerCase()
         });
-    });
 
-    logger.info('Test run created', { runId, environment, suites: testRun.suites, suiteId, testCaseIds });
+        logger.info(
+            'Test run created',
+            {
+                runId,
+                environment,
+                suites: testRun.suites
+            }
+        );
 
-    res.status(202).json({
-        message: 'Test run started',
-        runId,
-        status: TEST_RUN_STATUS.RUNNING
-    });
-});
+
+        /*
+         * Start execution.
+         *
+         * LOCAL:
+         * This works because the Node process remains alive.
+         *
+         * PRODUCTION:
+         * On Vercel/serverless this is NOT reliable.
+         * A queue/worker should eventually handle this.
+         */
+        executeInBackground(
+            runId,
+            environment,
+            {
+                suites: testRun.suites,
+                suiteId: testRun.suiteId,
+                testCaseIds: testRun.testCaseIds
+            }
+        ).catch((err) => {
+
+            logger.error(
+                'Unexpected error launching background execution',
+                {
+                    runId,
+                    message: err.message
+                }
+            );
+
+        });
+
+
+        res.status(202).json({
+            success: true,
+
+            message: 'Test run started',
+
+            runId,
+
+            status: TEST_RUN_STATUS.RUNNING,
+
+            run: normalizeRun(
+                testRun.toObject()
+            )
+        });
+    }
+);
+
 
 /**
- * GET /api/test-runs?environment=&status=
- * Returns recent runs first.
+ * GET /api/test-runs
+ *
+ * Returns recent test runs.
  */
-export const listTestRuns = asyncHandler(async (req, res) => {
-    const { environment, status } = req.query;
-    const filter = {};
-    if (environment) filter.environment = environment;
-    if (status) filter.status = status.toUpperCase();
+export const listTestRuns = asyncHandler(
+    async (req, res) => {
 
-    const limit = Math.min(parseInt(req.query.limit, 10) || 50, 200);
+        const {
+            environment,
+            status
+        } = req.query;
 
-    const runs = await TestRun.find(filter)
-        .sort({ startedAt: -1 })
-        .limit(limit)
-        .lean();
+        const filter = {};
 
-    res.json({ success: true, count: runs.length, runs });
-});
+        if (environment) {
+            filter.environment = environment;
+        }
+
+        if (status) {
+            filter.status = status.toUpperCase();
+        }
+
+        const limit = Math.min(
+            parseInt(req.query.limit, 10) || 50,
+            200
+        );
+
+        const runs = await TestRun.find(filter)
+            .sort({ startedAt: -1 })
+            .limit(limit)
+            .lean();
+
+
+        const normalizedRuns = runs.map(
+            normalizeRun
+        );
+
+
+        res.json({
+            success: true,
+
+            count: normalizedRuns.length,
+
+            runs: normalizedRuns
+        });
+    }
+);
+
 
 /**
  * GET /api/test-runs/:id
- * :id is treated as runId (the external identifier), per the spec's
- * preference for runId over Mongo's _id in the public API.
+ *
+ * :id is the external runId.
+ *
+ * Example:
+ *
+ * /api/test-runs/RUN-20260929-002
  */
-export const getTestRunById = asyncHandler(async (req, res) => {
-    const { id } = req.params;
+export const getTestRunById = asyncHandler(
+    async (req, res) => {
 
-    const run = await TestRun.findOne({ runId: id }).lean();
-    if (!run) {
-        throw new ApiError(404, `No test run found with runId "${id}"`);
+        const { id } = req.params;
+
+        if (!id || id === 'undefined') {
+            throw new ApiError(
+                400,
+                'Invalid test run ID.'
+            );
+        }
+
+
+        const run = await TestRun.findOne({
+            runId: id
+        }).lean();
+
+
+        if (!run) {
+            throw new ApiError(
+                404,
+                `No test run found with runId "${id}"`
+            );
+        }
+
+
+        const recentFailures =
+            await Failure.find({
+                runId: id
+            })
+                .sort({
+                    createdAt: -1
+                })
+                .limit(10)
+                .select(
+                    'title description severity category status createdAt'
+                )
+                .lean();
+
+
+        res.json({
+            success: true,
+
+            run: normalizeRun(run),
+
+            recentFailures
+        });
     }
-
-    const recentFailures = await Failure.find({ runId: id })
-        .sort({ createdAt: -1 })
-        .limit(5)
-        .select('title severity category status createdAt')
-        .lean();
-
-    res.json({
-        success: true,
-        run,
-        recentFailures
-    });
-});
+);
