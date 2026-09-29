@@ -12,4 +12,4 @@ coverage/
 .DS_Store
 *.log
 playwright/.auth/
-reports/playwright-results.json
+reports/playwright-results.json.env
