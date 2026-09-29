@@ -11,33 +11,44 @@ import { executeTestCaseWithPlaywright } from './playwrightCaseExecutor.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-// backend/services -> repo root is two levels up.
+/*
+ * backend/services
+ *      ↓
+ * backend
+ *      ↓
+ * repo root
+ */
 const REPO_ROOT = path.resolve(__dirname, '..', '..');
 
 /*
- * Maximum amount of time a single Playwright suite is allowed to run.
+ * Maximum time allowed for one Playwright suite.
  *
- * Default:
- *   2 minutes
+ * Default = 2 minutes.
  *
- * You can override this with:
+ * You can increase this:
  *
  * PLAYWRIGHT_TIMEOUT_MS=180000
- *
- * which would give Playwright 3 minutes.
  */
 const PLAYWRIGHT_TIMEOUT_MS = Number(
     process.env.PLAYWRIGHT_TIMEOUT_MS || 120000
 );
 
-// ---------------------------------------------------------------------
-// SUITE CONFIGURATION
-// ---------------------------------------------------------------------
-
-/**
- * Maps the platform's suite enum to the corresponding folder inside
- * test-engine/.
+/*
+ * Additional safety timeout around the complete suite execution.
+ *
+ * This protects against cases where spawn() itself or some filesystem
+ * operation gets stuck and the child-process timeout is never reached.
  */
+const SUITE_TOTAL_TIMEOUT_MS = Number(
+    process.env.SUITE_TOTAL_TIMEOUT_MS ||
+    PLAYWRIGHT_TIMEOUT_MS + 10000
+);
+
+
+// ============================================================================
+// SUITE CONFIGURATION
+// ============================================================================
+
 const SUITE_DIRS = Object.freeze({
     API: 'test-engine/api',
     UI: 'test-engine/ui',
@@ -47,6 +58,7 @@ const SUITE_DIRS = Object.freeze({
 });
 
 const ALL_SUITES = Object.keys(SUITE_DIRS);
+
 
 function resolveSuites(requestedSuites) {
     if (!requestedSuites || requestedSuites.length === 0) {
@@ -58,8 +70,18 @@ function resolveSuites(requestedSuites) {
         .filter((suite) => SUITE_DIRS[suite]);
 }
 
+
+// ============================================================================
+// FILE HELPERS
+// ============================================================================
+
 async function findSpecFiles(relativeDir) {
     const absoluteDir = path.join(REPO_ROOT, relativeDir);
+
+    logger.info('Looking for Playwright specs', {
+        relativeDir,
+        absoluteDir
+    });
 
     try {
         const entries = await readdir(
@@ -67,7 +89,7 @@ async function findSpecFiles(relativeDir) {
             { withFileTypes: true }
         );
 
-        return entries
+        const files = entries
             .filter(
                 (entry) =>
                     entry.isFile() &&
@@ -78,12 +100,21 @@ async function findSpecFiles(relativeDir) {
                     path.join(relativeDir, entry.name)
             );
 
+        logger.info('Playwright spec discovery completed', {
+            relativeDir,
+            count: files.length,
+            files
+        });
+
+        return files;
+
     } catch (error) {
 
-        logger.debug(
+        logger.warn(
             'Could not read Playwright suite directory',
             {
                 relativeDir,
+                absoluteDir,
                 message: error.message
             }
         );
@@ -92,15 +123,13 @@ async function findSpecFiles(relativeDir) {
     }
 }
 
-// ---------------------------------------------------------------------
-// MOCK EXECUTION MODE
-// ---------------------------------------------------------------------
 
 /**
- * Extracts test() titles from a spec file.
+ * Extract test titles from a spec file.
+ *
+ * This is only used by mock mode.
  */
 async function extractTestNames(specFilePath) {
-
     try {
 
         const content = await readFile(
@@ -110,7 +139,7 @@ async function extractTestNames(specFilePath) {
 
         const matches = [
             ...content.matchAll(
-                /test(?:\.\w+)?\(\s*['"](.+?)['"]/g
+                /test(?:\.\w+)?\s*\(\s*['"`]([^'"`]+)['"`]/g
             )
         ];
 
@@ -123,6 +152,19 @@ async function extractTestNames(specFilePath) {
         return [];
     }
 }
+
+
+function slugify(text) {
+    return String(text)
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/(^-|-$)/g, '');
+}
+
+
+// ============================================================================
+// MOCK EXECUTION
+// ============================================================================
 
 const MOCK_FAIL_REASONS_BY_SUITE = {
 
@@ -152,8 +194,8 @@ const MOCK_FAIL_REASONS_BY_SUITE = {
         'Intent recognition returned an unexpected intent',
         'Voice session did not complete the expected conversation goal'
     ]
-
 };
+
 
 function weightedRandomStatus() {
 
@@ -169,6 +211,7 @@ function weightedRandomStatus() {
 
     return 'SKIPPED';
 }
+
 
 async function generateMockResultsForSuite(
     suite,
@@ -238,7 +281,6 @@ async function generateMockResultsForSuite(
                         : null,
 
                 evidence: {}
-
             };
 
             if (status === 'FAIL') {
@@ -270,7 +312,6 @@ async function generateMockResultsForSuite(
                         `artifacts/${runId}/${slugify(testName)}.zip`,
 
                     video: null
-
                 };
             }
 
@@ -279,13 +320,6 @@ async function generateMockResultsForSuite(
     );
 }
 
-function slugify(text) {
-
-    return text
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, '-')
-        .replace(/(^-|-$)/g, '');
-}
 
 async function runMock({
     runId,
@@ -320,9 +354,10 @@ async function runMock({
     );
 }
 
-// ---------------------------------------------------------------------
-// REAL PLAYWRIGHT EXECUTION MODE
-// ---------------------------------------------------------------------
+
+// ============================================================================
+// PLAYWRIGHT STATUS
+// ============================================================================
 
 function mapPlaywrightStatus(status) {
 
@@ -341,9 +376,11 @@ function mapPlaywrightStatus(status) {
     return 'SKIPPED';
 }
 
-/**
- * Parses Playwright JSON reporter output.
- */
+
+// ============================================================================
+// PLAYWRIGHT JSON PARSER
+// ============================================================================
+
 function parsePlaywrightJson(
     json,
     suite
@@ -384,22 +421,22 @@ function parsePlaywrightJson(
 
                     const screenshot =
                         attachments.find(
-                            (a) =>
-                                a.name ===
+                            (attachment) =>
+                                attachment.name ===
                                 'screenshot'
                         )?.path || null;
 
                     const trace =
                         attachments.find(
-                            (a) =>
-                                a.name ===
+                            (attachment) =>
+                                attachment.name ===
                                 'trace'
                         )?.path || null;
 
                     const video =
                         attachments.find(
-                            (a) =>
-                                a.name ===
+                            (attachment) =>
+                                attachment.name ===
                                 'video'
                         )?.path || null;
 
@@ -436,9 +473,7 @@ function parsePlaywrightJson(
                             trace,
 
                             video
-
                         }
-
                     });
                 }
             }
@@ -471,24 +506,24 @@ function parsePlaywrightJson(
     return results;
 }
 
-// ---------------------------------------------------------------------
-// PROCESS TERMINATION HELPERS
-// ---------------------------------------------------------------------
 
-/**
- * Kill a Playwright process safely.
- *
- * Windows:
- *   taskkill kills the whole process tree.
- *
- * Linux/macOS:
- *   kill the process group first.
- */
+// ============================================================================
+// PROCESS TERMINATION
+// ============================================================================
+
 function killProcessTree(child) {
 
     if (!child || !child.pid) {
         return;
     }
+
+    logger.warn(
+        'Attempting to terminate Playwright process',
+        {
+            pid: child.pid,
+            platform: process.platform
+        }
+    );
 
     try {
 
@@ -518,9 +553,11 @@ function killProcessTree(child) {
 
             } catch {
 
-                child.kill(
-                    'SIGKILL'
-                );
+                try {
+                    child.kill('SIGKILL');
+                } catch {
+                    // Already dead.
+                }
             }
         }
 
@@ -537,14 +574,15 @@ function killProcessTree(child) {
         try {
             child.kill('SIGKILL');
         } catch {
-            // Process may already be dead.
+            // Already dead.
         }
     }
 }
 
-// ---------------------------------------------------------------------
-// REAL PLAYWRIGHT SUITE EXECUTION
-// ---------------------------------------------------------------------
+
+// ============================================================================
+// PLAYWRIGHT SUITE EXECUTION
+// ============================================================================
 
 async function runPlaywrightForSuite({
     suite,
@@ -554,15 +592,30 @@ async function runPlaywrightForSuite({
     const dir =
         SUITE_DIRS[suite];
 
+    logger.info(
+        'Starting Playwright suite',
+        {
+            suite,
+            dir,
+            environment,
+            repoRoot: REPO_ROOT
+        }
+    );
+
     const specFiles =
         await findSpecFiles(dir);
 
+    /*
+     * No spec files is NOT a runner crash.
+     * Return a skipped result so the TestRun can complete.
+     */
     if (specFiles.length === 0) {
 
         logger.warn(
             `No Playwright spec files found for suite ${suite}`,
             {
-                dir
+                dir,
+                repoRoot: REPO_ROOT
             }
         );
 
@@ -594,11 +647,20 @@ async function runPlaywrightForSuite({
                 page: null,
 
                 evidence: {}
-
             }
-
         ];
     }
+
+
+    logger.info(
+        'Playwright spec files found',
+        {
+            suite,
+            count: specFiles.length,
+            specFiles
+        }
+    );
+
 
     const tmpDir =
         await mkdtemp(
@@ -614,29 +676,77 @@ async function runPlaywrightForSuite({
             'result.json'
         );
 
+
+    logger.info(
+        'Created Playwright temporary directory',
+        {
+            suite,
+            tmpDir,
+            outputFile
+        }
+    );
+
+
     try {
 
         await new Promise(
             (resolve, reject) => {
 
-                /*
-                 * Windows requires npx.cmd.
-                 * Linux/macOS use npx.
-                 */
                 const npxCommand =
                     process.platform === 'win32'
                         ? 'npx.cmd'
                         : 'npx';
 
+
+                /*
+                 * IMPORTANT:
+                 *
+                 * --no-install prevents npx from trying to download
+                 * Playwright in production.
+                 *
+                 * CI=1 prevents interactive prompts.
+                 */
+                const args = [
+
+                    '--no-install',
+
+                    'playwright',
+
+                    'test',
+
+                    dir,
+
+                    '--reporter=json'
+                ];
+
+
+                logger.info(
+                    'Launching Playwright process',
+                    {
+                        suite,
+                        command:
+                            `${npxCommand} ${args.join(' ')}`,
+
+                        cwd:
+                            REPO_ROOT,
+
+                        timeoutMs:
+                            PLAYWRIGHT_TIMEOUT_MS
+                    }
+                );
+
+
+                let stdout = '';
+
+                let stderr = '';
+
+                let settled = false;
+
+
                 const child =
                     spawn(
                         npxCommand,
-                        [
-                            'playwright',
-                            'test',
-                            dir,
-                            '--reporter=json'
-                        ],
+                        args,
                         {
                             cwd:
                                 REPO_ROOT,
@@ -644,38 +754,64 @@ async function runPlaywrightForSuite({
                             env: {
                                 ...process.env,
 
+                                CI: '1',
+
                                 TEST_ENV:
                                     environment,
 
                                 PLAYWRIGHT_JSON_OUTPUT_NAME:
-                                    outputFile
+                                    outputFile,
+
+                                FORCE_COLOR:
+                                    '0'
                             },
 
                             /*
-                             * Create a process group so we can
-                             * terminate child processes as well.
+                             * Linux:
+                             * detached=true allows us to kill the
+                             * complete process group.
+                             *
+                             * Windows:
+                             * taskkill /T handles the process tree.
                              */
                             detached:
                                 process.platform !== 'win32',
 
                             windowsHide:
-                                true
+                                true,
+
+                            shell:
+                                false
                         }
                     );
 
-                let stderr = '';
 
-                let stdout = '';
+                logger.info(
+                    'Playwright process spawned',
+                    {
+                        suite,
+                        pid: child.pid
+                    }
+                );
 
-                let settled =
-                    false;
 
-                /*
-                 * Hard timeout.
-                 *
-                 * This is the important fix for the
-                 * "RUNNING forever" problem.
-                 */
+                const finishWithError =
+                    (error) => {
+
+                        if (settled) {
+                            return;
+                        }
+
+                        settled = true;
+
+                        clearTimeout(
+                            timeout
+                        );
+
+                        reject(error);
+                    };
+
+
                 const timeout =
                     setTimeout(
                         () => {
@@ -684,21 +820,14 @@ async function runPlaywrightForSuite({
                                 return;
                             }
 
-                            settled =
-                                true;
-
                             logger.error(
-                                `Playwright suite timed out: ${suite}`,
+                                'Playwright suite timeout reached',
                                 {
-                                    timeoutMs:
-                                        PLAYWRIGHT_TIMEOUT_MS,
-
                                     suite,
-
                                     environment,
-
-                                    pid:
-                                        child.pid
+                                    pid: child.pid,
+                                    timeoutMs:
+                                        PLAYWRIGHT_TIMEOUT_MS
                                 }
                             );
 
@@ -706,7 +835,7 @@ async function runPlaywrightForSuite({
                                 child
                             );
 
-                            reject(
+                            finishWithError(
                                 new Error(
                                     `Playwright suite "${suite}" ` +
                                     `timed out after ` +
@@ -718,14 +847,28 @@ async function runPlaywrightForSuite({
                         PLAYWRIGHT_TIMEOUT_MS
                     );
 
+
                 child.stdout?.on(
                     'data',
                     (chunk) => {
 
                         stdout +=
                             chunk.toString();
+
+                        /*
+                         * Do not log the entire Playwright JSON.
+                         */
+                        logger.debug(
+                            'Playwright stdout received',
+                            {
+                                suite,
+                                bytes:
+                                    chunk.length
+                            }
+                        );
                     }
                 );
+
 
                 child.stderr?.on(
                     'data',
@@ -733,29 +876,39 @@ async function runPlaywrightForSuite({
 
                         stderr +=
                             chunk.toString();
+
+                        logger.debug(
+                            'Playwright stderr received',
+                            {
+                                suite,
+                                bytes:
+                                    chunk.length
+                            }
+                        );
                     }
                 );
+
 
                 child.on(
                     'error',
                     (error) => {
 
-                        if (settled) {
-                            return;
-                        }
-
-                        settled =
-                            true;
-
-                        clearTimeout(
-                            timeout
+                        logger.error(
+                            'Playwright child process error',
+                            {
+                                suite,
+                                pid: child.pid,
+                                message:
+                                    error.message
+                            }
                         );
 
-                        reject(
+                        finishWithError(
                             error
                         );
                     }
                 );
+
 
                 child.on(
                     'close',
@@ -768,66 +921,182 @@ async function runPlaywrightForSuite({
                             return;
                         }
 
-                        settled =
-                            true;
+                        settled = true;
 
                         clearTimeout(
                             timeout
                         );
 
-                        /*
-                         * Playwright returns a non-zero exit code
-                         * when tests fail.
-                         *
-                         * That is NOT a runner error.
-                         *
-                         * We still parse the JSON report.
-                         */
+
                         logger.info(
-                            `Playwright process closed for ${suite}`,
+                            'Playwright process closed',
                             {
                                 suite,
-
+                                pid: child.pid,
                                 code,
-
                                 signal,
-
                                 stdoutLength:
                                     stdout.length,
-
                                 stderrLength:
                                     stderr.length
                             }
                         );
 
-                        if (stderr) {
 
-                            logger.debug(
-                                `Playwright stderr for ${suite}`,
-                                {
-                                    stderr
-                                }
-                            );
-                        }
-
+                        /*
+                         * Playwright uses a non-zero exit code when
+                         * tests fail.
+                         *
+                         * Therefore code !== 0 is NOT automatically
+                         * considered a runner error.
+                         */
                         resolve();
                     }
                 );
             }
         );
 
+
+        logger.info(
+            'Playwright process finished, reading JSON report',
+            {
+                suite,
+                outputFile
+            }
+        );
+
+
         /*
-         * The Playwright process finished.
-         * Now read the generated JSON report.
+         * The reporter should have written result.json.
          */
-        const raw =
-            await readFile(
-                outputFile,
-                'utf-8'
+        let raw;
+
+        try {
+
+            raw =
+                await readFile(
+                    outputFile,
+                    'utf-8'
+                );
+
+        } catch (error) {
+
+            /*
+             * Sometimes the JSON reporter may return JSON through
+             * stdout but fail to create the output file.
+             *
+             * Try stdout as a fallback.
+             */
+            logger.warn(
+                'Playwright JSON file could not be read',
+                {
+                    suite,
+                    outputFile,
+                    message:
+                        error.message,
+                    stdoutLength:
+                        stdout.length
+                }
             );
 
-        const json =
-            JSON.parse(raw);
+            if (stdout.trim()) {
+                raw = stdout;
+            } else {
+
+                return [
+
+                    {
+
+                        testName:
+                            `${suite} suite execution`,
+
+                        suite,
+
+                        status:
+                            'FAIL',
+
+                        duration:
+                            0,
+
+                        error:
+                            `Playwright finished but no JSON report ` +
+                            `was produced. ${error.message}`,
+
+                        expected: null,
+
+                        actual: null,
+
+                        endpoint: null,
+
+                        page: null,
+
+                        evidence: {}
+                    }
+                ];
+            }
+        }
+
+
+        let json;
+
+        try {
+
+            json =
+                JSON.parse(
+                    raw
+                );
+
+        } catch (error) {
+
+            logger.error(
+                'Could not parse Playwright JSON report',
+                {
+                    suite,
+                    message:
+                        error.message,
+
+                    rawLength:
+                        raw.length,
+
+                    stderr:
+                        stderr.slice(
+                            -4000
+                        )
+                }
+            );
+
+            return [
+
+                {
+
+                    testName:
+                        `${suite} suite execution`,
+
+                    suite,
+
+                    status:
+                        'FAIL',
+
+                    duration:
+                        0,
+
+                    error:
+                        `Invalid Playwright JSON report: ` +
+                        `${error.message}`,
+
+                    expected: null,
+
+                    actual: null,
+
+                    endpoint: null,
+
+                    page: null,
+
+                    evidence: {}
+                }
+            ];
+        }
+
 
         const results =
             parsePlaywrightJson(
@@ -835,9 +1104,12 @@ async function runPlaywrightForSuite({
                 suite
             );
 
+
         logger.info(
-            `Playwright execution completed for suite ${suite}`,
+            `Playwright results parsed for ${suite}`,
             {
+                suite,
+
                 tests:
                     results.length,
 
@@ -864,10 +1136,10 @@ async function runPlaywrightForSuite({
             }
         );
 
+
         /*
-         * If Playwright produced no results,
-         * return an explicit failure instead of
-         * silently returning zero tests.
+         * Never allow a successful Playwright process with an empty
+         * report to leave the TestRun at zero tests.
          */
         if (results.length === 0) {
 
@@ -899,19 +1171,21 @@ async function runPlaywrightForSuite({
                     page: null,
 
                     evidence: {}
-
                 }
-
             ];
         }
 
+
         return results;
+
 
     } catch (error) {
 
         logger.error(
             `Playwright execution failed for suite ${suite}`,
             {
+                suite,
+                environment,
                 message:
                     error.message,
 
@@ -919,6 +1193,7 @@ async function runPlaywrightForSuite({
                     error.stack
             }
         );
+
 
         return [
 
@@ -947,16 +1222,12 @@ async function runPlaywrightForSuite({
                 page: null,
 
                 evidence: {}
-
             }
-
         ];
+
 
     } finally {
 
-        /*
-         * Always clean temporary files.
-         */
         await rm(
             tmpDir,
             {
@@ -964,14 +1235,81 @@ async function runPlaywrightForSuite({
                 force: true
             }
         ).catch(
-            () => {}
+            (error) => {
+
+                logger.debug(
+                    'Could not remove Playwright temporary directory',
+                    {
+                        tmpDir,
+                        message:
+                            error.message
+                    }
+                );
+            }
         );
     }
 }
 
-// ---------------------------------------------------------------------
+
+// ============================================================================
+// COMPLETE SUITE SAFETY TIMEOUT
+// ============================================================================
+
+async function runSuiteWithTotalTimeout({
+    suite,
+    environment
+}) {
+
+    let timer;
+
+    try {
+
+        const timeoutPromise =
+            new Promise(
+                (_, reject) => {
+
+                    timer =
+                        setTimeout(
+                            () => {
+
+                                reject(
+                                    new Error(
+                                        `Complete suite "${suite}" ` +
+                                        `execution exceeded ` +
+                                        `${SUITE_TOTAL_TIMEOUT_MS} ms`
+                                    )
+                                );
+
+                            },
+                            SUITE_TOTAL_TIMEOUT_MS
+                        );
+                }
+            );
+
+
+        return await Promise.race([
+
+            runPlaywrightForSuite({
+                suite,
+                environment
+            }),
+
+            timeoutPromise
+
+        ]);
+
+    } finally {
+
+        if (timer) {
+            clearTimeout(timer);
+        }
+    }
+}
+
+
+// ============================================================================
 // PLAYWRIGHT EXECUTION
-// ---------------------------------------------------------------------
+// ============================================================================
 
 async function runPlaywright({
     environment,
@@ -983,38 +1321,68 @@ async function runPlaywright({
 
     const results = [];
 
+
+    logger.info(
+        'Starting Playwright execution',
+        {
+            environment,
+            suites
+        }
+    );
+
+
     for (
         const suite
         of suites
     ) {
 
+        logger.info(
+            'Beginning Playwright suite',
+            {
+                suite,
+                environment
+            }
+        );
+
+
         try {
 
-            /*
-             * Suites intentionally run sequentially.
-             */
             const suiteResults =
-                await runPlaywrightForSuite({
+                await runSuiteWithTotalTimeout({
                     suite,
                     environment
                 });
+
 
             results.push(
                 ...suiteResults
             );
 
+
+            logger.info(
+                'Playwright suite completed',
+                {
+                    suite,
+                    resultCount:
+                        suiteResults.length
+                }
+            );
+
+
         } catch (error) {
 
-            /*
-             * Final safety net.
-             */
             logger.error(
                 `Suite ${suite} caused an unexpected runner error`,
                 {
+                    suite,
                     message:
-                        error.message
+                        error.message,
+
+                    stack:
+                        error.stack
                 }
             );
+
 
             results.push({
 
@@ -1041,14 +1409,26 @@ async function runPlaywright({
                 page: null,
 
                 evidence: {}
-
             });
         }
     }
 
+
     const duration =
         Date.now() -
         startedAt;
+
+
+    logger.info(
+        'All Playwright suites completed',
+        {
+            suites,
+            resultCount:
+                results.length,
+            duration
+        }
+    );
+
 
     return buildSummary(
         results,
@@ -1056,9 +1436,10 @@ async function runPlaywright({
     );
 }
 
-// ---------------------------------------------------------------------
+
+// ============================================================================
 // SUMMARY
-// ---------------------------------------------------------------------
+// ============================================================================
 
 function buildSummary(
     results,
@@ -1070,6 +1451,7 @@ function buildSummary(
             ? results
             : [];
 
+
     const summary =
         safeResults.reduce(
             (
@@ -1078,6 +1460,7 @@ function buildSummary(
             ) => {
 
                 acc.totalTests += 1;
+
 
                 if (
                     result.status ===
@@ -1098,6 +1481,7 @@ function buildSummary(
                     acc.skipped += 1;
                 }
 
+
                 return acc;
 
             },
@@ -1109,6 +1493,7 @@ function buildSummary(
             }
         );
 
+
     return {
 
         ...summary,
@@ -1118,13 +1503,13 @@ function buildSummary(
 
         results:
             safeResults
-
     };
 }
 
-// ---------------------------------------------------------------------
-// STORED TEST CASE EXECUTION
-// ---------------------------------------------------------------------
+
+// ============================================================================
+// STORED TEST CASES
+// ============================================================================
 
 async function resolveTestCases({
     suiteId,
@@ -1149,6 +1534,7 @@ async function resolveTestCases({
         ).lean();
     }
 
+
     if (suiteId) {
 
         return TestCase.find(
@@ -1161,12 +1547,11 @@ async function resolveTestCases({
         ).lean();
     }
 
+
     return [];
 }
 
-/**
- * Mock-mode executor for stored test cases.
- */
+
 function runTestCaseMock(
     testCase,
     runId
@@ -1176,10 +1561,12 @@ function runTestCaseMock(
         Math.random() <
         0.75;
 
+
     const actual =
         shouldPass
             ? testCase.expectedResult
             : `unexpected result for ${testCase.testCaseId}`;
+
 
     const {
         status,
@@ -1190,12 +1577,14 @@ function runTestCaseMock(
             actual
         );
 
+
     const duration =
         Math.floor(
             150 +
             Math.random() *
             1800
         );
+
 
     const result = {
 
@@ -1228,8 +1617,8 @@ function runTestCaseMock(
 
         evidence:
             {}
-
     };
+
 
     if (
         status ===
@@ -1246,17 +1635,14 @@ function runTestCaseMock(
 
             video:
                 null
-
         };
     }
+
 
     return result;
 }
 
-/**
- * Placeholder for real execution of stored test cases
- * that do not yet have a dedicated executor.
- */
+
 function runTestCasePlaceholder(
     testCase
 ) {
@@ -1286,8 +1672,8 @@ function runTestCasePlaceholder(
 
         error:
             `No real execution engine exists yet for ${testCase.type} ` +
-            `test cases (API and UI/E2E run on real Playwright; ` +
-            `WEBSOCKET and AI_VOICE are not built yet).`,
+            `test cases. API and UI/E2E use Playwright. ` +
+            `WEBSOCKET and AI_VOICE are not built yet.`,
 
         endpoint:
             null,
@@ -1297,9 +1683,9 @@ function runTestCasePlaceholder(
 
         evidence:
             {}
-
     };
 }
+
 
 async function runStoredTestCases({
     runId,
@@ -1311,11 +1697,13 @@ async function runStoredTestCases({
     const startedAt =
         Date.now();
 
+
     const testCases =
         await resolveTestCases({
             suiteId,
             testCaseIds
         });
+
 
     if (
         testCases.length ===
@@ -1332,13 +1720,16 @@ async function runStoredTestCases({
         );
     }
 
+
     const mode =
         (
             process.env.TEST_EXECUTION_MODE ||
             'mock'
         ).toLowerCase();
 
+
     const results = [];
+
 
     for (
         const testCase
@@ -1360,15 +1751,7 @@ async function runStoredTestCases({
             continue;
         }
 
-        /*
-         * Real mode.
-         *
-         * API and UI/E2E cases use the real Playwright
-         * case executor.
-         *
-         * WEBSOCKET and AI_VOICE currently remain skipped
-         * until their dedicated executors exist.
-         */
+
         try {
 
             // eslint-disable-next-line no-await-in-loop
@@ -1378,12 +1761,14 @@ async function runStoredTestCases({
                     runId
                 );
 
+
             results.push(
                 real ||
                 runTestCasePlaceholder(
                     testCase
                 )
             );
+
 
         } catch (error) {
 
@@ -1402,6 +1787,7 @@ async function runStoredTestCases({
                         error.message
                 }
             );
+
 
             results.push({
 
@@ -1437,14 +1823,15 @@ async function runStoredTestCases({
 
                 evidence:
                     {}
-
             });
         }
     }
 
+
     const duration =
         Date.now() -
         startedAt;
+
 
     return buildSummary(
         results,
@@ -1452,21 +1839,11 @@ async function runStoredTestCases({
     );
 }
 
-// ---------------------------------------------------------------------
-// PUBLIC ENTRY POINT
-// ---------------------------------------------------------------------
 
-/**
- * Executes a test run and returns a normalized result structure.
- *
- * Two execution paths:
- *
- * 1. DB-driven:
- *    suiteId and/or testCaseIds
- *
- * 2. Legacy suite-folder:
- *    API/UI/E2E/WEBSOCKET/AI_VOICE
- */
+// ============================================================================
+// PUBLIC ENTRY POINT
+// ============================================================================
+
 export async function runTests({
     runId,
     environment,
@@ -1481,6 +1858,7 @@ export async function runTests({
             'mock'
         ).toLowerCase();
 
+
     const dbDriven =
         Boolean(
             suiteId ||
@@ -1489,6 +1867,13 @@ export async function runTests({
                 testCaseIds.length > 0
             )
         );
+
+
+    const resolvedSuites =
+        dbDriven
+            ? []
+            : resolveSuites(suites);
+
 
     logger.info(
         'Starting test execution',
@@ -1502,46 +1887,58 @@ export async function runTests({
             dbDriven,
 
             suites:
-                dbDriven
-                    ? undefined
-                    : resolveSuites(suites),
+                resolvedSuites,
 
             suiteId,
 
             testCaseIds,
 
             playwrightTimeoutMs:
-                PLAYWRIGHT_TIMEOUT_MS
+                PLAYWRIGHT_TIMEOUT_MS,
+
+            suiteTotalTimeoutMs:
+                SUITE_TOTAL_TIMEOUT_MS,
+
+            repoRoot:
+                REPO_ROOT
         }
     );
 
-    const outcome =
-        dbDriven
 
-            ? await runStoredTestCases({
+    let outcome;
+
+
+    if (dbDriven) {
+
+        outcome =
+            await runStoredTestCases({
                 runId,
                 environment,
                 suiteId,
                 testCaseIds
-            })
+            });
 
-            : mode === 'mock'
+    } else if (mode === 'mock') {
 
-                ? await runMock({
-                    runId,
-                    suites:
-                        resolveSuites(
-                            suites
-                        )
-                })
+        outcome =
+            await runMock({
+                runId,
 
-                : await runPlaywright({
-                    environment,
-                    suites:
-                        resolveSuites(
-                            suites
-                        )
-                });
+                suites:
+                    resolvedSuites
+            });
+
+    } else {
+
+        outcome =
+            await runPlaywright({
+                environment,
+
+                suites:
+                    resolvedSuites
+            });
+    }
+
 
     logger.info(
         'Test execution finished',
@@ -1565,8 +1962,10 @@ export async function runTests({
         }
     );
 
+
     return outcome;
 }
+
 
 export const AVAILABLE_SUITES =
     ALL_SUITES;
