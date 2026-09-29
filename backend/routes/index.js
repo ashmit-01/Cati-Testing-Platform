@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import dashboardRoutes from './dashboardRoutes.js';
 import healthRoutes from './healthRoutes.js';
 import testRunRoutes from './testRunRoutes.js';
 import resultRoutes from './resultRoutes.js';
@@ -9,6 +10,7 @@ import testSuiteRoutes from './testSuiteRoutes.js';
 
 const router = Router();
 
+router.use('/dashboard', dashboardRoutes);
 router.use('/health', healthRoutes);
 router.use('/test-cases', testCaseRoutes);
 router.use('/test-suites', testSuiteRoutes);
