@@ -98,7 +98,7 @@ export function normalizeTestResult(spec, result) {
               : "",
           ),
 
-          classification: classifyFailure(spec.file),
+          classification: classifyFailure(spec.file, result.error.message),
           severity: classifySeverity(result.error.message, spec.file),
           location: result.errorLocation
             ? {
