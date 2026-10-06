@@ -28,6 +28,19 @@ export const api = axios.create({
   }
 })
 
+api.interceptors.request.use(
+    (config) => {
+        const token = localStorage.getItem('adminToken');
+
+        if (token) {
+            config.headers.Authorization = `Bearer ${token}`;
+        }
+
+        return config;
+    },
+    (error) => Promise.reject(error)
+);
+
 // -----------------------------------------------------------------------
 // ERROR HANDLING
 // -----------------------------------------------------------------------
@@ -47,6 +60,20 @@ function toFriendlyError(error, fallbackMessage) {
   friendly.cause = error
 
   return friendly
+}
+
+export async function loginAdmin(email, password) {
+    const response = await api.post('/api/auth/login', {
+        email,
+        password,
+    });
+
+    const { token, user } = response.data;
+
+    localStorage.setItem('adminToken', token);
+    localStorage.setItem('adminUser', JSON.stringify(user));
+
+    return response.data;
 }
 
 // -----------------------------------------------------------------------
