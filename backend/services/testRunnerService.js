@@ -78,11 +78,51 @@ function resolveSuites(requestedSuites) {
 // FIND PLAYWRIGHT SPEC FILES
 // ---------------------------------------------------------
 
+function resolvePlaywrightProject(suite, specFile) {
+    const normalized = String(specFile).replace(/\\/g, '/').toLowerCase();
+    const suiteUpper = String(suite || '').toUpperCase();
+    if (suiteUpper === 'API' || normalized.includes('/api/')) {
+        return 'api';
+    }
+    if (suiteUpper === 'WEBSOCKET' || normalized.includes('/websocket/')) {
+        return 'websocket';
+    }
+    if (suiteUpper === 'AI_VOICE' || normalized.includes('/ai/')) {
+        return 'ai';
+    }
+    if (normalized.includes('login.spec.js') || normalized.includes('landing.spec.js')) {
+        return 'unauthenticated';
+    }
+    return 'chromium';
+}
+
 async function findSpecFiles(relativeDir) {
     const absoluteDir = path.join(
         REPO_ROOT,
         relativeDir
     );
+
+    async function scan(currentRelative) {
+        const currentAbsolute = path.join(REPO_ROOT, currentRelative);
+        try {
+            const entries = await readdir(currentAbsolute, { withFileTypes: true });
+            const found = [];
+            for (const entry of entries) {
+                const subRelative = path.join(currentRelative, entry.name);
+                if (entry.isDirectory()) {
+                    if (!['node_modules', '.git', 'data', 'fixtures', 'helpers'].includes(entry.name)) {
+                        const nested = await scan(subRelative);
+                        found.push(...nested);
+                    }
+                } else if (entry.isFile() && entry.name.endsWith('.spec.js')) {
+                    found.push(subRelative);
+                }
+            }
+            return found;
+        } catch {
+            return [];
+        }
+    }
 
     try {
         logger.info(
@@ -93,26 +133,7 @@ async function findSpecFiles(relativeDir) {
             }
         );
 
-        const entries = await readdir(
-            absoluteDir,
-            {
-                withFileTypes: true
-            }
-        );
-
-        const files = entries
-            .filter(
-                (entry) =>
-                    entry.isFile() &&
-                    entry.name.endsWith('.spec.js')
-            )
-            .map(
-                (entry) =>
-                    path.join(
-                        relativeDir,
-                        entry.name
-                    )
-            );
+        const files = await scan(relativeDir);
 
         logger.info(
             'Playwright spec discovery completed',
@@ -449,11 +470,12 @@ async function runSinglePlaywrightSpec({
                  * calls.spec.js
                  *      -> Running 41 tests
                  */
+                const targetProject = resolvePlaywrightProject(suite, specFile);
                 const args = [
                     'playwright',
                     'test',
                     specFile,
-                    '--project=chromium',
+                    `--project=${targetProject}`,
                     '--reporter=json',
                     '--workers=1',
                     '--timeout=30000'

@@ -1,72 +1,143 @@
 /**
  * WebSocket client helper.
  *
- * Thin, promise-based wrapper around the `ws` package. Contains NO
- * assertions — spec files decide what a pass/fail looks like. Every
- * function here resolves/rejects rather than throwing synchronously, so
- * spec files can use plain try/catch or `expect(...).rejects`.
+ * Thin, promise-based wrapper around the `ws` package, enhanced with:
+ * - Live message history recording
+ * - Error frame capture
+ * - Integrated AI Engine Error Evidence capture (Phase 7, 9, 10, 11)
+ * - Safe credential sanitization
+ *
+ * Contains NO assertions — spec files decide pass/fail.
  */
 
 import WebSocket from 'ws';
-import { TIMEOUTS } from '../data/ws.config.js';
+import { TIMEOUTS, WS_FRAMES } from '../data/ws.config.js';
+import { sanitizeData, captureAiWsEvidence } from '../../shared/aiErrorCapture.js';
 
-/**
- * Redacts secrets from evidence before it's attached to the HTML report.
- * Mirrors test-engine/api/fixtures/api.fixture.js#sanitizeEvidence so
- * report evidence looks consistent across suites.
- */
 export function sanitizeEvidence(data) {
-    if (!data) return data;
-    if (typeof data !== 'object') return data;
-    if (Array.isArray(data)) return data.map(sanitizeEvidence);
-
-    const sanitized = {};
-    for (const [key, value] of Object.entries(data)) {
-        if (/password|token|secret|authorization|cookie|apikey/i.test(key)) {
-            sanitized[key] = '[REDACTED]';
-        } else if (typeof value === 'object' && value !== null) {
-            sanitized[key] = sanitizeEvidence(value);
-        } else {
-            sanitized[key] = value;
-        }
-    }
-    return sanitized;
+    return sanitizeData(data);
 }
 
-/** Attaches connection/message evidence to the Playwright HTML report. */
-export async function attachWsEvidence(testInfo, details) {
+/**
+ * Attaches connection/message evidence and structured AI Engine Error Evidence
+ * to the Playwright report.
+ */
+export async function attachWsEvidence(testInfo, details = {}) {
     if (!testInfo) return;
     try {
-        await testInfo.attach('WebSocket Evidence', {
-            contentType: 'application/json',
-            body: JSON.stringify(sanitizeEvidence(details), null, 2),
+        await captureAiWsEvidence(testInfo, {
+            endpoint: details.endpoint || '',
+            step: details.step || 'interaction',
+            connectionStatus: details.connectionStatus || (details.outcome === 'opened' ? 'connected' : 'rejected'),
+            handshakeStatus: details.handshakeStatus || details.error?.handshakeStatus || null,
+            closeCode: details.closeCode || details.closeResult?.code || details.error?.closeCode || null,
+            closeReason: details.closeReason || details.closeResult?.reason || '',
+            errorFrame: details.errorFrame || null,
+            messageHistory: details.messageHistory || [],
+            error: details.error,
+            expected: Boolean(details.expected),
         });
     } catch {
-        // Safe fallback if attachment fails
+        // Safe fallback
     }
 }
 
 /**
- * Opens a WebSocket connection and resolves once it is open, or rejects
- * on error / timeout / a non-101 handshake response.
+ * Enhanced WebSocket session wrapper that tracks message history and error frames.
+ */
+export class WsSession {
+    constructor(ws, url, testInfo = null) {
+        this.ws = ws;
+        this.url = url;
+        this.testInfo = testInfo;
+        this.messageHistory = [];
+        this.lastErrorFrame = null;
+        this.isClosed = false;
+        this.closeCode = null;
+        this.closeReason = '';
+
+        this._setupListeners();
+    }
+
+    _setupListeners() {
+        this.ws.on('message', (data, isBinary) => {
+            const raw = isBinary ? `<binary ${data.length} bytes>` : data.toString();
+            let json = null;
+            if (!isBinary) {
+                try {
+                    json = JSON.parse(raw);
+                } catch {}
+            }
+
+            const record = {
+                direction: 'inbound',
+                timestamp: new Date().toISOString(),
+                isBinary: Boolean(isBinary),
+                raw,
+                json,
+            };
+
+            this.messageHistory.push(record);
+
+            // Check if this is an error frame from the server
+            if (json && (json.type === WS_FRAMES.ERROR || json.error || json.status === 'error')) {
+                this.lastErrorFrame = json;
+            }
+        });
+
+        this.ws.once('close', (code, reason) => {
+            this.isClosed = true;
+            this.closeCode = code;
+            this.closeReason = reason?.toString() || '';
+        });
+    }
+
+    send(payload) {
+        const text = typeof payload === 'string' ? payload : JSON.stringify(payload);
+        let parsed = null;
+        try {
+            parsed = JSON.parse(text);
+        } catch {}
+
+        this.messageHistory.push({
+            direction: 'outbound',
+            timestamp: new Date().toISOString(),
+            raw: text,
+            json: parsed,
+        });
+
+        this.ws.send(text);
+    }
+
+    async close(code = 1000, reason = 'test complete') {
+        return closeSocket(this.ws, code, reason);
+    }
+}
+
+/**
+ * Opens a WebSocket connection and resolves once open, or rejects on error.
  *
  * @param {string} url
  * @param {object} [opts]
- * @param {string} [opts.token] - bearer token, sent both as a `token`
- *   query param and an Authorization header, since the real CATI auth
- *   contract for the handshake isn't confirmed (see ws.config.js).
+ * @param {string} [opts.token] - JWT token
+ * @param {string} [opts.agentId] - Owned agentId
  * @param {Record<string,string>} [opts.headers]
  * @param {number} [opts.timeoutMs]
- * @returns {Promise<{ws: WebSocket, handshakeStatus: number|null}>}
+ * @param {import('@playwright/test').TestInfo} [opts.testInfo]
+ * @returns {Promise<{ws: WebSocket, session: WsSession, handshakeStatus: number}>}
  */
 export function openSocket(url, opts = {}) {
-    const { token, headers = {}, timeoutMs = TIMEOUTS.connect } = opts;
+    const { token, agentId, headers = {}, timeoutMs = TIMEOUTS.connect, testInfo = null } = opts;
 
     return new Promise((resolve, reject) => {
         let settled = false;
         let handshakeStatus = null;
 
-        const finalUrl = token ? `${url}${url.includes('?') ? '&' : '?'}token=${encodeURIComponent(token)}` : url;
+        const urlObj = new URL(url);
+        if (token) urlObj.searchParams.set('token', token);
+        if (agentId) urlObj.searchParams.set('agentId', agentId);
+        const finalUrl = urlObj.toString();
+
         const finalHeaders = token
             ? { Authorization: `Bearer ${token}`, ...headers }
             : headers;
@@ -88,7 +159,8 @@ export function openSocket(url, opts = {}) {
             if (settled) return;
             settled = true;
             clearTimeout(timer);
-            resolve({ ws, handshakeStatus: handshakeStatus ?? 101 });
+            const session = new WsSession(ws, finalUrl, testInfo);
+            resolve({ ws, session, handshakeStatus: handshakeStatus ?? 101 });
         });
 
         ws.once('unexpected-response', (_req, res) => {
@@ -96,7 +168,9 @@ export function openSocket(url, opts = {}) {
             settled = true;
             clearTimeout(timer);
             handshakeStatus = res.statusCode;
-            reject(Object.assign(new Error(`Unexpected handshake response: ${res.statusCode}`), { handshakeStatus }));
+            reject(Object.assign(new Error(`Unexpected handshake response: ${res.statusCode}`), {
+                handshakeStatus: res.statusCode,
+            }));
         });
 
         ws.once('error', (err) => {
@@ -114,6 +188,7 @@ export function openSocket(url, opts = {}) {
                 Object.assign(new Error(`Socket closed before opening (code ${code})`), {
                     closeCode: code,
                     closeReason: reasonBuf?.toString() || '',
+                    handshakeStatus,
                 })
             );
         });
@@ -122,20 +197,18 @@ export function openSocket(url, opts = {}) {
 
 /** Sends a JS object as a JSON text frame. */
 export function sendJson(ws, payload) {
-    ws.send(JSON.stringify(payload));
+    if (ws instanceof WsSession) {
+        ws.send(payload);
+    } else {
+        ws.send(JSON.stringify(payload));
+    }
 }
 
 /**
- * Waits for the next message matching `predicate` (default: any message).
- * Non-JSON frames are passed to the predicate/resolved value as a raw
- * string under `.raw`, with `.json` left undefined.
- *
- * @param {WebSocket} ws
- * @param {object} [opts]
- * @param {(msg: {json: any, raw: string}) => boolean} [opts.predicate]
- * @param {number} [opts.timeoutMs]
+ * Waits for the next message matching predicate.
  */
 export function waitForMessage(ws, opts = {}) {
+    const rawWs = ws instanceof WsSession ? ws.ws : ws;
     const { predicate = () => true, timeoutMs = TIMEOUTS.message } = opts;
 
     return new Promise((resolve, reject) => {
@@ -145,12 +218,12 @@ export function waitForMessage(ws, opts = {}) {
             if (settled) return;
             settled = true;
             cleanup();
-            reject(new Error(`Timed out after ${timeoutMs}ms waiting for a matching WebSocket message`));
+            reject(new Error(`Timed out after ${timeoutMs}ms waiting for matching WebSocket message`));
         }, timeoutMs);
 
         function onMessage(data, isBinary) {
             if (settled) return;
-            let json;
+            let json = null;
             let raw;
             if (isBinary) {
                 raw = `<binary ${data.length} bytes>`;
@@ -158,9 +231,7 @@ export function waitForMessage(ws, opts = {}) {
                 raw = data.toString();
                 try {
                     json = JSON.parse(raw);
-                } catch {
-                    // leave json undefined for non-JSON text frames
-                }
+                } catch {}
             }
             const msg = { json, raw, isBinary: Boolean(isBinary) };
             if (predicate(msg)) {
@@ -191,59 +262,28 @@ export function waitForMessage(ws, opts = {}) {
 
         function cleanup() {
             clearTimeout(timer);
-            ws.off('message', onMessage);
-            ws.off('close', onClose);
-            ws.off('error', onError);
+            rawWs.off('message', onMessage);
+            rawWs.off('close', onClose);
+            rawWs.off('error', onError);
         }
 
-        ws.on('message', onMessage);
-        ws.on('close', onClose);
-        ws.on('error', onError);
-    });
-}
-
-/**
- * Collects every message received during a fixed time window. Useful for
- * "did the server send an unsolicited session/ack event right after
- * connecting" style checks where there's no single predicate to wait for.
- */
-export function collectMessagesFor(ws, durationMs) {
-    const messages = [];
-    const onMessage = (data, isBinary) => {
-        if (isBinary) {
-            messages.push({ raw: `<binary ${data.length} bytes>`, isBinary: true });
-            return;
-        }
-        const raw = data.toString();
-        let json;
-        try {
-            json = JSON.parse(raw);
-        } catch {
-            // non-JSON text frame
-        }
-        messages.push({ json, raw, isBinary: false });
-    };
-
-    ws.on('message', onMessage);
-
-    return new Promise((resolve) => {
-        setTimeout(() => {
-            ws.off('message', onMessage);
-            resolve(messages);
-        }, durationMs);
+        rawWs.on('message', onMessage);
+        rawWs.once('close', onClose);
+        rawWs.once('error', onError);
     });
 }
 
 /** Closes the socket and resolves once the close handshake completes. */
 export function closeSocket(ws, code = 1000, reason = 'test complete') {
-    if (ws.readyState === WebSocket.CLOSED) {
-        return Promise.resolve({ code: ws._closeCode ?? null, reason: '' });
+    const rawWs = ws instanceof WsSession ? ws.ws : ws;
+    if (rawWs.readyState === WebSocket.CLOSED) {
+        return Promise.resolve({ code: rawWs._closeCode ?? null, reason: '' });
     }
 
     return new Promise((resolve) => {
         const timer = setTimeout(() => {
-            ws.off('close', onClose);
-            ws.terminate();
+            rawWs.off('close', onClose);
+            rawWs.terminate();
             resolve({ code: null, reason: 'force-terminated after close timeout' });
         }, TIMEOUTS.connect);
 
@@ -252,22 +292,23 @@ export function closeSocket(ws, code = 1000, reason = 'test complete') {
             resolve({ code: closeCode, reason: reasonBuf?.toString() || '' });
         }
 
-        ws.once('close', onClose);
+        rawWs.once('close', onClose);
 
         try {
-            ws.close(code, reason);
+            rawWs.close(code, reason);
         } catch {
             clearTimeout(timer);
-            ws.off('close', onClose);
-            ws.terminate();
+            rawWs.off('close', onClose);
+            rawWs.terminate();
             resolve({ code: null, reason: 'terminated: close() threw' });
         }
     });
 }
 
-/** Abruptly kills the connection without a close handshake (simulates a dropped connection / network loss). */
+/** Abruptly kills connection without a handshake. */
 export function killSocket(ws) {
-    ws.terminate();
+    const rawWs = ws instanceof WsSession ? ws.ws : ws;
+    rawWs.terminate();
 }
 
 export { WebSocket };

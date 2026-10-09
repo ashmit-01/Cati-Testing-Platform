@@ -4,23 +4,6 @@ import fs from 'fs';
 
 setup.setTimeout(60_000);
 
-console.log('🔥 AUTH SETUP STARTED');
-
-console.log(
-    'FRONTEND_URL =',
-    process.env.FRONTEND_URL
-);
-
-console.log(
-    'TEST_EMAIL =',
-    !!process.env.TEST_EMAIL
-);
-
-console.log(
-    'TEST_PASSWORD =',
-    !!process.env.TEST_PASSWORD
-);
-
 const authDir = path.join(
     process.cwd(),
     'playwright',
@@ -35,39 +18,14 @@ const authFile = path.join(
 setup('authenticate', async ({ page }) => {
     const email = process.env.TEST_EMAIL;
     const password = process.env.TEST_PASSWORD;
-    const baseURL = process.env.FRONTEND_URL;
+    const baseURL = process.env.FRONTEND_URL || 'https://usecati.com';
+
+    setup.skip(!email || !password, 'UI authentication setup skipped: TEST_EMAIL and TEST_PASSWORD must be set in .env');
 
     console.log('========== AUTH SETUP ==========');
-
-    console.log(
-        'FRONTEND_URL:',
-        baseURL
-    );
-
-    console.log(
-        'TEST_EMAIL configured:',
-        !!email
-    );
-
-    console.log(
-        'TEST_PASSWORD configured:',
-        !!password
-    );
-
-    expect(
-        baseURL,
-        'FRONTEND_URL must be configured'
-    ).toBeTruthy();
-
-    expect(
-        email,
-        'TEST_EMAIL must be configured'
-    ).toBeTruthy();
-
-    expect(
-        password,
-        'TEST_PASSWORD must be configured'
-    ).toBeTruthy();
+    console.log('FRONTEND_URL:', baseURL);
+    console.log('TEST_EMAIL configured:', !!email);
+    console.log('TEST_PASSWORD configured:', !!password);
 
     console.log('Opening CATI login...');
 
