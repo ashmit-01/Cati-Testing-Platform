@@ -1,34 +1,15 @@
 /**
  * WebSocket endpoint + protocol configuration.
  *
- * This is the ONE place that should change if CATI's real-time protocol
- * differs from what is assumed here. Nothing in the spec files hardcodes
- * a URL, event name, or field name directly — they all read from this
- * module so a protocol confirmation from the CATI engineering team only
- * requires editing this file.
- *
- * ---------------------------------------------------------------------
- * ASSUMPTIONS (confirm against real CATI protocol docs / source before
- * trusting FAIL results from tests that rely on them):
- *
- * 1. All three sockets speak JSON text frames (not raw binary framing for
- *    control messages). Binary frames are assumed only for the actual
- *    audio payload chunks on /ws/audio and inside /ws/vobiz.
- * 2. Auth is passed as a bearer token, either as a `token` query-string
- *    param or an `Authorization: Bearer <token>` header during the
- *    handshake. Both are attempted (see wsClient.helper.js).
- * 3. A client "start" event uses the shape { event: 'start', sessionId }.
- * 4. The server acknowledges session creation with a message containing
- *    a `sessionId` (or `session_id`) field, in an event whose name
- *    contains "session" or "start" (checked case-insensitively).
- * 5. Text/audio turns are sent as { event: 'message', sessionId, text }
- *    or { event: 'media', sessionId, audio: <base64> }.
- * 6. Malformed/invalid input produces either a WS close with a non-1000
- *    code, or a JSON error frame containing an `error` field — a test is
- *    considered to have caught the invalid-input case if either happens.
- *
- * Update WS_PROTOCOL below once the real contract is confirmed.
- * ---------------------------------------------------------------------
+ * Aligned with actual CATI backend architecture:
+ * - Real endpoints:
+ *     /realtime (AI Engine real-time turn bridge)
+ *     /ws/vobiz (Telephony bridge)
+ * - Required connection credentials:
+ *     JWT token + agentId
+ * - Server-side & client-side frame types:
+ *     connected | transcript | response | audio | error
+ * - Error frame capture & standard close codes
  */
 
 import { randomUUID } from 'crypto';
@@ -41,33 +22,42 @@ function toWsUrl(httpUrl) {
 const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:5000';
 const BACKEND_WS_BASE = toWsUrl(BACKEND_URL);
 
-// The Python AI engine may be a fully separate host, so it gets its own
-// env var (already present in .env.example: AI_ENGINE_WS_URL). Fall back
-// to deriving it from AI_ENGINE_URL, then from the backend, so the suite
-// still runs (against a best guess) in a minimally configured environment.
 const AI_ENGINE_WS_BASE =
     process.env.AI_ENGINE_WS_URL ||
     toWsUrl(process.env.AI_ENGINE_URL) ||
-    BACKEND_WS_BASE;
+    'wss://fucr8ewyudjjbqlxhajoahpn.200.234.39.243.sslip.io';
 
-/** Raw WebSocket endpoint URLs, one per socket under test. */
+/** Raw WebSocket endpoint URLs, matching actual CATI routes. */
 export const WS_ENDPOINTS = Object.freeze({
+    REALTIME: `${BACKEND_WS_BASE}/realtime`,
     VOBIZ: `${BACKEND_WS_BASE}/ws/vobiz`,
-    AI_ENGINE: `${BACKEND_WS_BASE}/api/ws/ai-engine`,
-    AUDIO: `${AI_ENGINE_WS_BASE}/ws/audio`,
+    DIRECT_REALTIME: `${AI_ENGINE_WS_BASE}/realtime`,
+    AI_ENGINE: `${BACKEND_WS_BASE}/realtime`, // Legacy alias
+    AUDIO: `${AI_ENGINE_WS_BASE}/realtime`,   // Legacy alias
 });
 
-/** Field / event-name vocabulary — see assumption #3-#6 above. */
+/** Real frame types supported by the CATI backend and AI engine. */
+export const WS_FRAMES = Object.freeze({
+    CONNECTED: 'connected',
+    TRANSCRIPT: 'transcript',
+    RESPONSE: 'response',
+    AUDIO: 'audio',
+    ERROR: 'error',
+    MESSAGE: 'message',
+    START: 'start',
+});
+
+/** Backward-compatible protocol field names for legacy connection tests */
 export const WS_PROTOCOL = Object.freeze({
-    eventField: 'event',
+    eventField: 'type',
     sessionIdField: 'sessionId',
     startEventName: 'start',
-    messageEventName: 'message',
-    mediaEventName: 'media',
+    messageEventName: 'transcript',
+    mediaEventName: 'audio',
     errorField: 'error',
 });
 
-/** Close codes worth asserting on explicitly. */
+/** Standard RFC 6455 WebSocket close codes. */
 export const CLOSE_CODES = Object.freeze({
     NORMAL: 1000,
     GOING_AWAY: 1001,
@@ -88,44 +78,87 @@ export function newSessionId() {
     return randomUUID();
 }
 
-/** Deliberately malformed / unroutable session id for negative tests. */
+/** Deliberately invalid session ID / agent ID for negative tests */
+export const INVALID_AGENT_ID = 'not-a-real-agent-id-12345';
 export const INVALID_SESSION_ID = 'not-a-real-session-####';
+export const VALID_FAKE_AGENT_ID = '507f1f77bcf86cd799439011';
 
-export function buildStartEvent(sessionId = newSessionId()) {
-    return {
-        [WS_PROTOCOL.eventField]: WS_PROTOCOL.startEventName,
-        [WS_PROTOCOL.sessionIdField]: sessionId,
-    };
+/**
+ * Builds WebSocket URL with query parameters (token, agentId)
+ */
+export function buildWsUrl(endpoint, { token, agentId } = {}) {
+    const url = new URL(endpoint);
+    if (token) url.searchParams.set('token', token);
+    if (agentId) url.searchParams.set('agentId', agentId);
+    return url.toString();
 }
 
+/**
+ * Builds client-side transcript frame
+ */
+export function buildTranscriptFrame(text = 'Hello, this is automated QA testing.', agentId = null) {
+    const frame = {
+        type: WS_FRAMES.TRANSCRIPT,
+        text,
+        timestamp: new Date().toISOString(),
+    };
+    if (agentId) frame.agentId = agentId;
+    return frame;
+}
+
+/** Legacy alias for buildTranscriptFrame */
 export function buildTextMessageEvent(sessionId, text = 'Hello, this is an automated QA test message.') {
     return {
-        [WS_PROTOCOL.eventField]: WS_PROTOCOL.messageEventName,
-        [WS_PROTOCOL.sessionIdField]: sessionId,
+        type: WS_FRAMES.TRANSCRIPT,
+        sessionId,
         text,
     };
 }
 
 /**
- * A tiny (44-byte header + 0 samples) silent WAV file, base64-encoded.
- * Safe to send repeatedly: it carries no real audio/PII and produces no
- * telephony side effects. Good enough to exercise the "did the server
- * accept and respond to an audio frame" path without needing a real
- * recording.
+ * Silent WAV file chunk base64 for audio transmission testing
  */
 export const SILENT_WAV_BASE64 =
     'UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=';
 
+/**
+ * Builds audio turn frame
+ */
+export function buildAudioFrame(audioBase64 = SILENT_WAV_BASE64, agentId = null) {
+    const frame = {
+        type: WS_FRAMES.AUDIO,
+        data: audioBase64,
+        format: 'audio/wav',
+        timestamp: new Date().toISOString(),
+    };
+    if (agentId) frame.agentId = agentId;
+    return frame;
+}
+
+/** Legacy alias for buildAudioFrame */
 export function buildAudioChunkEvent(sessionId, audioBase64 = SILENT_WAV_BASE64) {
     return {
-        [WS_PROTOCOL.eventField]: WS_PROTOCOL.mediaEventName,
-        [WS_PROTOCOL.sessionIdField]: sessionId,
-        audio: audioBase64,
+        type: WS_FRAMES.AUDIO,
+        sessionId,
+        data: audioBase64,
     };
 }
 
+/** Legacy alias for start session frame */
+export function buildStartEvent(sessionId = newSessionId()) {
+    return {
+        type: WS_FRAMES.START,
+        sessionId,
+    };
+}
+
+/**
+ * Builds deliberately malformed payload
+ */
 export function buildMalformedPayload() {
-    // Intentionally invalid JSON-shaped-but-wrong payload: missing the
-    // event field entirely and using an unexpected type for sessionId.
-    return { sessionId: 12345, unexpectedField: true };
+    return {
+        type: 'invalid_unsupported_frame_type',
+        brokenField: 99999,
+        corrupt: true,
+    };
 }

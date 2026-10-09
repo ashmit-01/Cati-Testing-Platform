@@ -5,20 +5,45 @@ import path from "path";
 import { buildReportSummary } from "./lib/reportSummary.js";
 import { normalizeTestResult } from "./lib/resultNormalizer.js";
 
-const json = JSON.parse(
-  fs.readFileSync("./reports/playwright-results.json", "utf-8"),
-);
+// Locate the most current Playwright JSON output
+const candidatePaths = [
+  process.env.PLAYWRIGHT_JSON_OUTPUT_FILE,
+  "./playwright-results.json",
+  "./reports/playwright-results.json",
+].filter(Boolean);
+
+let jsonPath = candidatePaths.find((p) => fs.existsSync(p));
+
+if (!jsonPath) {
+  console.error("No Playwright results JSON found in candidate locations:", candidatePaths);
+  process.exit(1);
+}
+
+console.log("Reading Playwright results from:", jsonPath);
+const json = JSON.parse(fs.readFileSync(jsonPath, "utf-8"));
 
 const normalizedResults = [];
 
-for (const suite of json.suites || []) {
-  for (const spec of suite.specs || []) {
-    for (const test of spec.tests || []) {
-      for (const result of test.results || []) {
-        normalizedResults.push(normalizeTestResult(spec, result));
+function walkSuite(node) {
+  if (!node) return;
+
+  if (node.specs) {
+    for (const spec of node.specs) {
+      for (const test of spec.tests || []) {
+        for (const result of test.results || []) {
+          normalizedResults.push(normalizeTestResult(spec, result));
+        }
       }
     }
   }
+
+  for (const child of node.suites || []) {
+    walkSuite(child);
+  }
+}
+
+for (const rootSuite of json.suites || []) {
+  walkSuite(rootSuite);
 }
 
 console.log("Normalized results:", normalizedResults.length);
@@ -33,7 +58,6 @@ const report = {
 };
 
 const outputDir = "./reports/generated";
-
 fs.mkdirSync(outputDir, { recursive: true });
 
 fs.writeFileSync(

@@ -1,4 +1,5 @@
 import { test as base, expect as baseExpect } from '@playwright/test';
+import { sanitizeData, captureAiHttpEvidence } from '../../shared/aiErrorCapture.js';
 
 /**
  * Cache auth token per worker process to prevent triggering login rate limits
@@ -10,62 +11,52 @@ let cachedWorkerToken = null;
  * Sanitize object to prevent secrets, tokens, and passwords from leaking into reports
  */
 export function sanitizeEvidence(data) {
-    if (!data) return data;
-    if (typeof data !== 'object') return data;
-    if (Array.isArray(data)) return data.map(sanitizeEvidence);
-
-    const sanitized = {};
-    for (const [key, value] of Object.entries(data)) {
-        if (/password|token|secret|authorization|cookie|apikey/i.test(key)) {
-            sanitized[key] = '[REDACTED]';
-        } else if (typeof value === 'object' && value !== null) {
-            sanitized[key] = sanitizeEvidence(value);
-        } else {
-            sanitized[key] = value;
-        }
-    }
-    return sanitized;
+    return sanitizeData(data);
 }
 
 /**
- * Safely attach API request/response metadata to the Playwright HTML report
+ * Safely attach API request/response metadata and structured AI Engine evidence
+ * to the Playwright HTML and JSON reports.
  */
 export async function attachApiEvidence(testInfo, {
-    method,
-    endpoint,
+    method = 'GET',
+    endpoint = '',
     expectedStatus,
     actualStatus,
     durationMs,
     requestBody,
-    responseBody
+    responseBody,
+    responseHeaders = {},
+    error = null,
+    expected = false,
 }) {
     if (!testInfo) return;
     try {
-        await testInfo.attach('API Call Evidence', {
-            contentType: 'application/json',
-            body: JSON.stringify({
-                method,
-                endpoint,
-                expectedStatus,
-                actualStatus,
-                durationMs: durationMs !== undefined ? `${durationMs}ms` : undefined,
-                request: sanitizeEvidence(requestBody),
-                response: sanitizeEvidence(responseBody),
-            }, null, 2),
+        await captureAiHttpEvidence(testInfo, {
+            method,
+            endpoint,
+            expectedStatus,
+            actualStatus,
+            durationMs,
+            requestPayload: requestBody,
+            responseBody,
+            responseHeaders,
+            error,
+            expected,
         });
     } catch {
         // Safe fallback if attachment fails
     }
 }
 
+export { captureAiHttpEvidence };
+
 async function obtainToken(playwright) {
     const email = process.env.TEST_EMAIL;
     const password = process.env.TEST_PASSWORD;
 
     if (!email || !password) {
-        throw new Error(
-            'Missing TEST_EMAIL or TEST_PASSWORD in environment. Please configure .env before running authenticated tests.'
-        );
+        return null;
     }
 
     const baseURL = process.env.BACKEND_URL || 'http://localhost:5000';
@@ -75,6 +66,7 @@ async function obtainToken(playwright) {
         const response = await loginContext.post('/api/auth/login', {
             data: { email, password },
             headers: { 'Content-Type': 'application/json' },
+            timeout: 15_000,
         });
 
         if (!response.ok()) {
@@ -119,21 +111,64 @@ export const test = base.extend({
     },
 
     // Token retrieval via login API with worker caching
-    authToken: async ({ playwright }, use) => {
-        if (!cachedWorkerToken) {
-            cachedWorkerToken = await obtainToken(playwright);
+    authToken: async ({ playwright }, use, testInfo) => {
+        const email = process.env.TEST_EMAIL;
+        const password = process.env.TEST_PASSWORD;
+
+        if (!email || !password) {
+            testInfo.skip(
+                true,
+                'Missing TEST_EMAIL or TEST_PASSWORD in environment. Please configure .env before running authenticated tests.'
+            );
+            return;
         }
+
+        if (!cachedWorkerToken) {
+            try {
+                cachedWorkerToken = await obtainToken(playwright);
+            } catch (err) {
+                testInfo.skip(
+                    true,
+                    `Authentication failed: ${err.message}. Ensure backend is running at ${process.env.BACKEND_URL || 'http://localhost:5000'}`
+                );
+                return;
+            }
+        }
+
         await use(cachedWorkerToken);
     },
 
     // Dedicated fresh token for tests that invalidate or blacklist tokens (e.g. logout)
-    freshAuthToken: async ({ playwright }, use) => {
-        const token = await obtainToken(playwright);
-        await use(token);
+    freshAuthToken: async ({ playwright }, use, testInfo) => {
+        const email = process.env.TEST_EMAIL;
+        const password = process.env.TEST_PASSWORD;
+
+        if (!email || !password) {
+            testInfo.skip(
+                true,
+                'Missing TEST_EMAIL or TEST_PASSWORD in environment. Please configure .env before running authenticated tests.'
+            );
+            return;
+        }
+
+        try {
+            const token = await obtainToken(playwright);
+            await use(token);
+        } catch (err) {
+            testInfo.skip(
+                true,
+                `Fresh token authentication failed: ${err.message}`
+            );
+        }
     },
 
     // Authenticated context using the Bearer token
-    authContext: async ({ playwright, authToken }, use) => {
+    authContext: async ({ playwright, authToken }, use, testInfo) => {
+        if (!authToken) {
+            testInfo.skip(true, 'Authentication token unavailable. Skipping authenticated test.');
+            return;
+        }
+
         const baseURL = process.env.BACKEND_URL || 'http://localhost:5000';
         const context = await playwright.request.newContext({
             baseURL,

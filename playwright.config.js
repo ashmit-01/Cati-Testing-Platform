@@ -151,7 +151,7 @@ export default defineConfig({
       // Pure Node WebSocket protocol tests (no browser/page needed) -
       // kept out of the 'chromium' project so they don't depend on the
       // UI 'setup' project or a storageState file.
-      testMatch: /websocket\/.*\.spec\.js/,
+      testMatch: /(^|[\\/])websocket[\\/].*\.spec\.js/,
 
       use: {
         baseURL: process.env.BACKEND_URL || 'http://localhost:5000',
@@ -163,7 +163,7 @@ export default defineConfig({
 
       // AI/voice behavioral tests drive the AI engine over REST
       // (test-engine/api/helpers/aiEngine.helper.js), not a browser.
-      testMatch: /(^|\/)ai\/.*\.spec\.js/,
+      testMatch: /(^|[\\/])ai[\\/].*\.spec\.js/,
 
       use: {
         baseURL: process.env.BACKEND_URL || 'http://localhost:5000',
