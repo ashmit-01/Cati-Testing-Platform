@@ -519,86 +519,72 @@ async function runSinglePlaywrightSpec({
         }
     );
 
-    try {
-        await new Promise(
-            (resolve, reject) => {
-                const command =
-                    process.platform === 'win32'
-                        ? 'npx.cmd'
-                        : 'npx';
+    
+try {
+    await new Promise(
+        (resolve, reject) => {
+            // Launch Playwright directly through Node.js.
+            // This avoids Windows npx.cmd spawn issues.
+            
+const command = process.execPath;
 
-                /*
-                 * IMPORTANT:
-                 *
-                 * This specFile MUST be included here.
-                 *
-                 * Previously the runner created `args`
-                 * containing specFile but then ignored `args`
-                 * and launched the whole Playwright suite.
-                 *
-                 * That is what caused:
-                 *
-                 * agents.spec.js
-                 *      -> Running 41 tests
-                 *
-                 * bulk-calling.spec.js
-                 *      -> Running 41 tests
-                 *
-                 * calls.spec.js
-                 *      -> Running 41 tests
-                 */
-                const targetProject = resolvePlaywrightProject(suite, specFile);
-                const args = [
-                    'playwright',
-                    'test',
+const playwrightCli = path.join(
+    REPO_ROOT,
+    'node_modules',
+    'playwright',
+    'cli.js'
+);
+
+const targetProject = resolvePlaywrightProject(
+    suite,
+    specFile
+);
+
+// Normalize Windows paths before passing them to Playwright.
+const cliSpecFile = specFile.replace(/\\/g, '/');
+
+const args = [
+    playwrightCli,
+    'test',
+    cliSpecFile,
+    `--project=${targetProject}`,
+    '--reporter=json',
+    '--workers=1',
+    '--timeout=30000'
+];
+
+            logger.info(
+                'Launching individual Playwright spec',
+                {
+                    suite,
                     specFile,
-                    `--project=${targetProject}`,
-                    '--reporter=json',
-                    '--workers=1',
-                    '--timeout=30000'
-                ];
+                    command: `${command} ${args.join(' ')}`,
+                    cwd: REPO_ROOT
+                }
+            );
 
-                logger.info(
-                    'Launching individual Playwright spec',
-                    {
-                        suite,
-                        specFile,
-                        command:
-                            `${command} ${args.join(' ')}`,
-                        cwd: REPO_ROOT
-                    }
-                );
+            const child = spawn(
+                command,
+                args,
+                {
+                    cwd: REPO_ROOT,
 
-                const child = spawn(
-                    command,
-                    args,
-                    {
-                        cwd: REPO_ROOT,
+                    env: {
+                        ...process.env,
+                        CI: 'true',
+                        TEST_ENV: environment,
+                        PLAYWRIGHT_JSON_OUTPUT_FILE: outputFile,
+                        PLAYWRIGHT_BROWSERS_PATH:
+                            process.env.PLAYWRIGHT_BROWSERS_PATH || '0'
+                    },
 
-                        env: {
-                            ...process.env,
+                    detached: process.platform !== 'win32',
+                    windowsHide: true
+                }
+            );
 
-                            CI: 'true',
-
-                            TEST_ENV:
-                                environment,
-
-                            PLAYWRIGHT_JSON_OUTPUT_FILE:
-                                outputFile,
-
-                            PLAYWRIGHT_BROWSERS_PATH:
-                                process.env
-                                    .PLAYWRIGHT_BROWSERS_PATH ||
-                                '0'
-                        },
-
-                        detached:
-                            process.platform !==
-                            'win32',
-
-                        windowsHide: true
-                    }
-                );
+            // Keep your existing event handlers below this point.
+            // Do not duplicate them.
 
                 let stdout = '';
                 let stderr = '';
