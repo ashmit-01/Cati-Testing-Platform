@@ -4,6 +4,7 @@ import fs from "fs";
 import { classifyFailure } from "./failureClassifier.js";
 import { classifySeverity } from "./severityClassifier.js";
 import { parseAssertionError } from "./assertionParser.js";
+import { sanitizeErrorText, buildLlmErrorContext } from "../../test-engine/shared/aiErrorCapture.js";
 
 function readJsonAttachment(attachment) {
   if (!attachment) return null;
@@ -141,8 +142,10 @@ export function normalizeTestResult(spec, result) {
 
     failure: result.error
       ? {
-          message: result.error.message,
-          stack: result.error.stack,
+          message: sanitizeErrorText(result.error.message, { preserveStack: false }),
+          rawMessage: result.error.message,
+          stack: sanitizeErrorText(result.error.stack || result.error.message),
+          rawStack: result.error.stack,
 
           ...parseAssertionError(
             result.error.message,
@@ -164,6 +167,18 @@ export function normalizeTestResult(spec, result) {
             : null,
         }
       : null,
-    evidence,
+    evidence: {
+      ...evidence,
+      llmContext: result.error
+        ? buildLlmErrorContext({
+            testName: spec.title,
+            testFile: spec.file,
+            error: result.error.message,
+            stack: result.error.stack,
+            evidence,
+            environment: process.env.TEST_ENV || "unknown"
+          })
+        : undefined
+    },
   };
 }

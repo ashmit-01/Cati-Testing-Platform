@@ -17,6 +17,11 @@ import { checkResult } from './resultCheckerService.js';
 import {
     executeTestCaseWithPlaywright
 } from './playwrightCaseExecutor.js';
+import {
+    sanitizeErrorText,
+    parseAssertionDetails,
+    buildLlmErrorContext
+} from '../../test-engine/shared/aiErrorCapture.js';
 
 const __dirname = path.dirname(
     fileURLToPath(import.meta.url)
@@ -194,6 +199,18 @@ function mapPlaywrightStatus(status) {
 // PARSE PLAYWRIGHT JSON
 // ---------------------------------------------------------
 
+function readAttachmentPayload(attachment) {
+    if (!attachment) return null;
+    if (attachment.body) {
+        try {
+            return JSON.parse(Buffer.from(attachment.body, 'base64').toString('utf-8'));
+        } catch {
+            return null;
+        }
+    }
+    return null;
+}
+
 function parsePlaywrightJson(
     json,
     suite,
@@ -219,10 +236,20 @@ function parsePlaywrightJson(
                             test.status
                         );
 
-                    const errorMessage =
+                    const rawErrorMessage =
                         lastResult?.error?.message ||
                         lastResult?.errors?.[0]?.message ||
                         null;
+
+                    const rawStack =
+                        lastResult?.error?.stack ||
+                        lastResult?.errors?.[0]?.stack ||
+                        null;
+
+                    const cleanErrorMessage =
+                        rawErrorMessage
+                            ? sanitizeErrorText(rawErrorMessage, { preserveStack: true })
+                            : null;
 
                     const attachments =
                         lastResult?.attachments || [];
@@ -248,6 +275,58 @@ function parsePlaywrightJson(
                                 'video'
                         )?.path || null;
 
+                    const aiEngineAtt = attachments.find((a) => a.name === 'AI Engine Error Evidence');
+                    const apiCallAtt = attachments.find((a) => a.name === 'API Call Evidence');
+                    const wsAtt = attachments.find((a) => a.name === 'WebSocket Evidence');
+
+                    const aiEngineError = readAttachmentPayload(aiEngineAtt);
+                    const apiCall = readAttachmentPayload(apiCallAtt);
+                    const webSocket = readAttachmentPayload(wsAtt);
+
+                    const assertionDetails = parseAssertionDetails(cleanErrorMessage);
+
+                    const expectedVal =
+                        apiCall?.expectedStatus !== undefined
+                            ? apiCall.expectedStatus
+                            : (assertionDetails.expected !== null ? assertionDetails.expected : null);
+
+                    const actualVal =
+                        apiCall?.actualStatus !== undefined
+                            ? apiCall.actualStatus
+                            : (assertionDetails.actual !== null ? assertionDetails.actual : null);
+
+                    const endpointVal =
+                        apiCall?.endpoint ||
+                        aiEngineError?.endpoint ||
+                        webSocket?.endpoint ||
+                        null;
+
+                    const structuredEvidence = {
+                        screenshot,
+                        trace,
+                        video,
+                        rawError: rawErrorMessage,
+                        rawStack,
+                        ...(apiCall ? { apiCall } : {}),
+                        ...(aiEngineError ? { aiEngineError } : {}),
+                        ...(webSocket ? { webSocket } : {})
+                    };
+
+                    if (status === 'FAIL') {
+                        structuredEvidence.llmContext = buildLlmErrorContext({
+                            testName: spec.title || test.title || path.basename(specFile),
+                            testFile: filePath || specFile || null,
+                            suite,
+                            method: apiCall?.method,
+                            endpoint: endpointVal,
+                            expectedStatus: expectedVal,
+                            actualStatus: actualVal,
+                            error: cleanErrorMessage,
+                            stack: rawStack,
+                            evidence: structuredEvidence
+                        });
+                    }
+
                     results.push({
                         testName:
                             spec.title ||
@@ -261,24 +340,22 @@ function parsePlaywrightJson(
                         duration:
                             lastResult?.duration || 0,
 
-                        error: errorMessage,
+                        error: cleanErrorMessage,
 
-                        expected: null,
+                        rawError: rawErrorMessage,
 
-                        actual: null,
+                        expected: expectedVal,
 
-                        endpoint: null,
+                        actual: actualVal,
+
+                        endpoint: endpointVal,
 
                         page:
                             filePath ||
                             specFile ||
                             null,
 
-                        evidence: {
-                            screenshot,
-                            trace,
-                            video
-                        }
+                        evidence: structuredEvidence
                     });
                 }
             }

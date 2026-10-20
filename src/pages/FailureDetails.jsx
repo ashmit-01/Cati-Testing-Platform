@@ -15,6 +15,13 @@ const EVIDENCE_META = [
   { key: 'response', label: 'Response', icon: Code2, action: 'Download' }
 ]
 
+function stripAnsiText(text) {
+  if (!text) return ''
+  return String(text)
+    .replace(/(?:\\u001b|\\x1b|\u001b|\x1b)(?:\[[0-9;?]*[a-zA-Z]|\][^\u0007\u001b]*(?:\u0007|\u001b\\)|[@-Z\\-_]|[0-9a-zA-Z#%()]|)|\[\d+(?:;\d+)*m/gi, '')
+    .trim()
+}
+
 function Field({ label, children }) {
   return (
     <div>
@@ -81,6 +88,15 @@ export default function FailureDetails() {
         <Field label="Suite">{f.suite}</Field>
         <Field label="Environment">{f.environment}</Field>
       </div>
+
+      {(f.description || f.error) && (
+        <div className="rounded-lg border border-border bg-card p-5">
+          <p className="text-xs font-medium uppercase tracking-wide text-secondary">Failure Description</p>
+          <pre className="mt-2 whitespace-pre-wrap break-words font-mono text-sm text-primary">
+            {stripAnsiText(f.description || f.error)}
+          </pre>
+        </div>
+      )}
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="rounded-lg border border-border bg-card p-5">

@@ -118,6 +118,13 @@ function safeText(value, fallback = 'Not available') {
   }
 }
 
+function stripAnsiText(text) {
+  if (!text) return ''
+  return String(text)
+    .replace(/(?:\\u001b|\\x1b|\u001b|\x1b)(?:\[[0-9;?]*[a-zA-Z]|\][^\u0007\u001b]*(?:\u0007|\u001b\\)|[@-Z\\-_]|[0-9a-zA-Z#%()]|)|\[\d+(?:;\d+)*m/gi, '')
+    .trim()
+}
+
 
 function normalizeSuite(value) {
   if (
@@ -706,13 +713,14 @@ export default function FailureDetails() {
     )
 
 
-  const description =
-    safeText(
-      failure?.description ||
-      failure?.error ||
-      result?.error,
-      'No failure description available.'
-    )
+  const rawDescription = safeText(
+    failure?.description ||
+    failure?.error ||
+    result?.error,
+    'No failure description available.'
+  )
+
+  const description = stripAnsiText(rawDescription) || 'No failure description available.'
 
 
   // ==========================================================
