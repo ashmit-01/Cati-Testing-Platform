@@ -27,52 +27,6 @@ export const FAILURE_CATEGORY = Object.freeze({
     OTHER: 'OTHER'
 });
 
-export const AI_ANALYSIS_STATUS = Object.freeze({
-    PENDING: 'PENDING',
-    COMPLETED: 'COMPLETED',
-    ERROR: 'ERROR'
-});
-
-export const AI_ANALYSIS_CONFIDENCE = Object.freeze({
-    LOW: 'Low',
-    MEDIUM: 'Medium',
-    HIGH: 'High'
-});
-
-/**
- * LLM-generated analysis of a failure's TEXT evidence. This is a
- * recommendation only: it never changes the failure's status or the
- * linked TestResult, and an analysis error never affects the failure.
- *
- * `status` is null until analysis has been requested for the failure.
- */
-const aiAnalysisSchema = new Schema(
-    {
-        status: {
-            type: String,
-            enum: Object.values(AI_ANALYSIS_STATUS),
-            default: null
-        },
-        probableCause: { type: String, default: null },
-        supportingEvidence: { type: String, default: null },
-        suggestedFix: { type: String, default: null },
-        confidence: {
-            type: String,
-            enum: Object.values(AI_ANALYSIS_CONFIDENCE),
-            default: null
-        },
-        // Filled when the evidence was too thin for a confident answer.
-        additionalInfoNeeded: { type: String, default: null },
-        error: { type: String, default: null },
-        provider: { type: String, default: null },
-        model: { type: String, default: null },
-        attempts: { type: Number, default: 0 },
-        requestedAt: { type: Date, default: null },
-        completedAt: { type: Date, default: null }
-    },
-    { _id: false }
-);
-
 const failureSchema = new Schema(
     {
         runId: {
@@ -111,8 +65,7 @@ const failureSchema = new Schema(
             default: FAILURE_STATUS.OPEN,
             index: true
         },
-        evidence: { type: Schema.Types.Mixed, default: () => ({}) },
-        aiAnalysis: { type: aiAnalysisSchema, default: () => ({}) }
+        evidence: { type: Schema.Types.Mixed, default: () => ({}) }
     },
     { timestamps: { createdAt: true, updatedAt: false } }
 );
