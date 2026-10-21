@@ -1,0 +1,745 @@
+{
+  "config": {
+    "argv": [
+      "C:\\Program Files\\nodejs\\node.exe",
+      "C:\\Users\\rosha\\OneDrive\\Dokumenty\\Desktop\\CATI\\Testing platform\\Cati-Testing-Platform\\node_modules\\@playwright\\test\\cli.js",
+      "test",
+      "test-engine/api/specs/ai-engine-error-capture.spec.js",
+      "test-engine/websocket/ai-engine.spec.js"
+    ],
+    "configFile": "C:\\Users\\rosha\\OneDrive\\Dokumenty\\Desktop\\CATI\\Testing platform\\Cati-Testing-Platform\\playwright.config.js",
+    "rootDir": "C:/Users/rosha/OneDrive/Dokumenty/Desktop/CATI/Testing platform/Cati-Testing-Platform/test-engine",
+    "failOnFlakyTests": false,
+    "forbidOnly": false,
+    "fullyParallel": false,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 1
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "C:/Users/rosha/OneDrive/Dokumenty/Desktop/CATI/Testing platform/Cati-Testing-Platform/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "setup",
+        "name": "setup",
+        "testDir": "C:/Users/rosha/OneDrive/Dokumenty/Desktop/CATI/Testing platform/Cati-Testing-Platform/test-engine",
+        "testIgnore": [],
+        "testMatch": [
+          "/auth\\.setup\\.js/"
+        ],
+        "timeout": 45000
+      },
+      {
+        "outputDir": "C:/Users/rosha/OneDrive/Dokumenty/Desktop/CATI/Testing platform/Cati-Testing-Platform/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "chromium",
+        "name": "chromium",
+        "testDir": "C:/Users/rosha/OneDrive/Dokumenty/Desktop/CATI/Testing platform/Cati-Testing-Platform/test-engine",
+        "testIgnore": [
+          "**/login.spec.js",
+          "**/landing.spec.js",
+          "**/api/**",
+          "**/websocket/**",
+          "**/ai/**"
+        ],
+        "testMatch": [
+          "/.*\\.spec\\.js/"
+        ],
+        "timeout": 45000
+      },
+      {
+        "outputDir": "C:/Users/rosha/OneDrive/Dokumenty/Desktop/CATI/Testing platform/Cati-Testing-Platform/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "unauthenticated",
+        "name": "unauthenticated",
+        "testDir": "C:/Users/rosha/OneDrive/Dokumenty/Desktop/CATI/Testing platform/Cati-Testing-Platform/test-engine",
+        "testIgnore": [],
+        "testMatch": [
+          "**/login.spec.js",
+          "**/landing.spec.js"
+        ],
+        "timeout": 45000
+      },
+      {
+        "outputDir": "C:/Users/rosha/OneDrive/Dokumenty/Desktop/CATI/Testing platform/Cati-Testing-Platform/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "api",
+        "name": "api",
+        "testDir": "C:/Users/rosha/OneDrive/Dokumenty/Desktop/CATI/Testing platform/Cati-Testing-Platform/test-engine",
+        "testIgnore": [],
+        "testMatch": [
+          "/api[\\\\/]specs[\\\\/].*\\.spec\\.js/"
+        ],
+        "timeout": 45000
+      },
+      {
+        "outputDir": "C:/Users/rosha/OneDrive/Dokumenty/Desktop/CATI/Testing platform/Cati-Testing-Platform/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "websocket",
+        "name": "websocket",
+        "testDir": "C:/Users/rosha/OneDrive/Dokumenty/Desktop/CATI/Testing platform/Cati-Testing-Platform/test-engine",
+        "testIgnore": [],
+        "testMatch": [
+          "/(^|[\\\\/])websocket[\\\\/].*\\.spec\\.js/"
+        ],
+        "timeout": 45000
+      },
+      {
+        "outputDir": "C:/Users/rosha/OneDrive/Dokumenty/Desktop/CATI/Testing platform/Cati-Testing-Platform/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "ai",
+        "name": "ai",
+        "testDir": "C:/Users/rosha/OneDrive/Dokumenty/Desktop/CATI/Testing platform/Cati-Testing-Platform/test-engine",
+        "testIgnore": [],
+        "testMatch": [
+          "/(^|[\\\\/])ai[\\\\/].*\\.spec\\.js/"
+        ],
+        "timeout": 45000
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "list",
+        null
+      ],
+      [
+        "json",
+        {
+          "outputFile": "playwright-results.json"
+        }
+      ],
+      [
+        "html",
+        {
+          "outputFolder": "playwright-report",
+          "open": "never"
+        }
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.63.0",
+    "workers": 1,
+    "webServer": null
+  },
+  "suites": [
+    {
+      "title": "api\\specs\\ai-engine-error-capture.spec.js",
+      "file": "api/specs/ai-engine-error-capture.spec.js",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "AI Engine Live Error Capture - Direct Validation",
+          "file": "api/specs/ai-engine-error-capture.spec.js",
+          "line": 26,
+          "column": 6,
+          "specs": [
+            {
+              "title": "1. live HTTP error capture - real 405 Method Not Allowed response captured as expected error evidence",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "api",
+                  "projectName": "api",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 641,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-08T13:14:11.062Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "AI Engine Error Evidence",
+                          "contentType": "application/json",
+                          "body": "ewogICJ0ZXN0IjogIjEuIGxpdmUgSFRUUCBlcnJvciBjYXB0dXJlIC0gcmVhbCA0MDUgTWV0aG9kIE5vdCBBbGxvd2VkIHJlc3BvbnNlIGNhcHR1cmVkIGFzIGV4cGVjdGVkIGVycm9yIGV2aWRlbmNlIiwKICAic291cmNlIjogIkFJIEVuZ2luZSIsCiAgInByb3RvY29sIjogIkhUVFAiLAogICJlbmRwb2ludCI6ICJodHRwczovL2Z1Y3I4ZXd5dWRqamJxbHhoYWpvYWhwbi4yMDAuMjM0LjM5LjI0My5zc2xpcC5pby9hcGkvcHJlYnVpbGQiLAogICJtZXRob2QiOiAiR0VUIiwKICAidGltZXN0YW1wIjogIjIwMjYtMTAtMDhUMTM6MTQ6MTEuNzYzWiIsCiAgImR1cmF0aW9uTXMiOiA1NTMsCiAgImV4cGVjdGVkU3RhdHVzIjogNDA1LAogICJhY3R1YWxTdGF0dXMiOiA0MDUsCiAgImVycm9yIjogIkhUVFAgNDA1IiwKICAiZXhwZWN0ZWQiOiB0cnVlLAogICJoZWFkZXJzIjogewogICAgImNvbnRlbnQtbGVuZ3RoIjogIjE1MyIsCiAgICAiY29udGVudC10eXBlIjogInRleHQvaHRtbDsgY2hhcnNldD11dGYtOCIsCiAgICAiZGF0ZSI6ICJUaHUsIDA4IE9jdCAyMDI2IDEzOjE0OjEyIEdNVCIsCiAgICAic2VydmVyIjogImd1bmljb3JuIgogIH0sCiAgInJlcXVlc3QiOiBudWxsLAogICJyZXNwb25zZSI6ICI8IWRvY3R5cGUgaHRtbD5cbjxodG1sIGxhbmc9ZW4+XG48dGl0bGU+NDA1IE1ldGhvZCBOb3QgQWxsb3dlZDwvdGl0bGU+XG48aDE+TWV0aG9kIE5vdCBBbGxvd2VkPC9oMT5cbjxwPlRoZSBtZXRob2QgaXMgbm90IGFsbG93ZWQgZm9yIHRoZSByZXF1ZXN0ZWQgVVJMLjwvcD5cbiIsCiAgImNsYXNzaWZpY2F0aW9uIjogIkFJIEVuZ2luZSIKfQ=="
+                        },
+                        {
+                          "name": "API Call Evidence",
+                          "contentType": "application/json",
+                          "body": "ewogICJtZXRob2QiOiAiR0VUIiwKICAiZW5kcG9pbnQiOiAiaHR0cHM6Ly9mdWNyOGV3eXVkampicWx4aGFqb2FocG4uMjAwLjIzNC4zOS4yNDMuc3NsaXAuaW8vYXBpL3ByZWJ1aWxkIiwKICAiZXhwZWN0ZWRTdGF0dXMiOiA0MDUsCiAgImFjdHVhbFN0YXR1cyI6IDQwNSwKICAiZHVyYXRpb25NcyI6ICI1NTNtcyIsCiAgInJlcXVlc3QiOiBudWxsLAogICJyZXNwb25zZSI6ICI8IWRvY3R5cGUgaHRtbD5cbjxodG1sIGxhbmc9ZW4+XG48dGl0bGU+NDA1IE1ldGhvZCBOb3QgQWxsb3dlZDwvdGl0bGU+XG48aDE+TWV0aG9kIE5vdCBBbGxvd2VkPC9oMT5cbjxwPlRoZSBtZXRob2QgaXMgbm90IGFsbG93ZWQgZm9yIHRoZSByZXF1ZXN0ZWQgVVJMLjwvcD5cbiIsCiAgInNvdXJjZSI6ICJBSSBFbmdpbmUiLAogICJleHBlY3RlZCI6IHRydWUKfQ=="
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "e42fb058afcddf2e3f7f-4b20cb744d1b8afa5f95",
+              "file": "api/specs/ai-engine-error-capture.spec.js",
+              "line": 27,
+              "column": 5
+            },
+            {
+              "title": "2. live HTTP 404 capture - real nonexistent route error captured with response body and timing",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "api",
+                  "projectName": "api",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 164,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-08T13:14:11.838Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "AI Engine Error Evidence",
+                          "contentType": "application/json",
+                          "body": "ewogICJ0ZXN0IjogIjIuIGxpdmUgSFRUUCA0MDQgY2FwdHVyZSAtIHJlYWwgbm9uZXhpc3RlbnQgcm91dGUgZXJyb3IgY2FwdHVyZWQgd2l0aCByZXNwb25zZSBib2R5IGFuZCB0aW1pbmciLAogICJzb3VyY2UiOiAiQUkgRW5naW5lIiwKICAicHJvdG9jb2wiOiAiSFRUUCIsCiAgImVuZHBvaW50IjogImh0dHBzOi8vZnVjcjhld3l1ZGpqYnFseGhham9haHBuLjIwMC4yMzQuMzkuMjQzLnNzbGlwLmlvL25vbmV4aXN0ZW50LXFhLXZlcmlmaWNhdGlvbi1yb3V0ZSIsCiAgIm1ldGhvZCI6ICJHRVQiLAogICJ0aW1lc3RhbXAiOiAiMjAyNi0xMC0wOFQxMzoxNDoxMS45OTVaIiwKICAiZHVyYXRpb25NcyI6IDEzMiwKICAiZXhwZWN0ZWRTdGF0dXMiOiA0MDQsCiAgImFjdHVhbFN0YXR1cyI6IDQwNCwKICAiZXJyb3IiOiAiSFRUUCA0MDQiLAogICJleHBlY3RlZCI6IHRydWUsCiAgImhlYWRlcnMiOiB7CiAgICAiY29udGVudC1sZW5ndGgiOiAiMjA3IiwKICAgICJjb250ZW50LXR5cGUiOiAidGV4dC9odG1sOyBjaGFyc2V0PXV0Zi04IiwKICAgICJkYXRlIjogIlRodSwgMDggT2N0IDIwMjYgMTM6MTQ6MTIgR01UIiwKICAgICJzZXJ2ZXIiOiAiZ3VuaWNvcm4iCiAgfSwKICAicmVxdWVzdCI6IG51bGwsCiAgInJlc3BvbnNlIjogIjwhZG9jdHlwZSBodG1sPlxuPGh0bWwgbGFuZz1lbj5cbjx0aXRsZT40MDQgTm90IEZvdW5kPC90aXRsZT5cbjxoMT5Ob3QgRm91bmQ8L2gxPlxuPHA+VGhlIHJlcXVlc3RlZCBVUkwgd2FzIG5vdCBmb3VuZCBvbiB0aGUgc2VydmVyLiBJZiB5b3UgZW50ZXJlZCB0aGUgVVJMIG1hbnVhbGx5IHBsZWFzZSBjaGVjayB5b3VyIHNwZWxsaW5nIGFuZCB0cnkgYWdhaW4uPC9wPlxuIiwKICAiY2xhc3NpZmljYXRpb24iOiAiQUkgRW5naW5lIgp9"
+                        },
+                        {
+                          "name": "API Call Evidence",
+                          "contentType": "application/json",
+                          "body": "ewogICJtZXRob2QiOiAiR0VUIiwKICAiZW5kcG9pbnQiOiAiaHR0cHM6Ly9mdWNyOGV3eXVkampicWx4aGFqb2FocG4uMjAwLjIzNC4zOS4yNDMuc3NsaXAuaW8vbm9uZXhpc3RlbnQtcWEtdmVyaWZpY2F0aW9uLXJvdXRlIiwKICAiZXhwZWN0ZWRTdGF0dXMiOiA0MDQsCiAgImFjdHVhbFN0YXR1cyI6IDQwNCwKICAiZHVyYXRpb25NcyI6ICIxMzJtcyIsCiAgInJlcXVlc3QiOiBudWxsLAogICJyZXNwb25zZSI6ICI8IWRvY3R5cGUgaHRtbD5cbjxodG1sIGxhbmc9ZW4+XG48dGl0bGU+NDA0IE5vdCBGb3VuZDwvdGl0bGU+XG48aDE+Tm90IEZvdW5kPC9oMT5cbjxwPlRoZSByZXF1ZXN0ZWQgVVJMIHdhcyBub3QgZm91bmQgb24gdGhlIHNlcnZlci4gSWYgeW91IGVudGVyZWQgdGhlIFVSTCBtYW51YWxseSBwbGVhc2UgY2hlY2sgeW91ciBzcGVsbGluZyBhbmQgdHJ5IGFnYWluLjwvcD5cbiIsCiAgInNvdXJjZSI6ICJBSSBFbmdpbmUiLAogICJleHBlY3RlZCI6IHRydWUKfQ=="
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "e42fb058afcddf2e3f7f-0213693f0d39a3009b13",
+              "file": "api/specs/ai-engine-error-capture.spec.js",
+              "line": 63,
+              "column": 5
+            },
+            {
+              "title": "3. sensitive data sanitization - tokens, passwords, and API keys are redacted",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "api",
+                  "projectName": "api",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 12,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-08T13:14:12.036Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "e42fb058afcddf2e3f7f-39218b992916b925c74a",
+              "file": "api/specs/ai-engine-error-capture.spec.js",
+              "line": 86,
+              "column": 5
+            },
+            {
+              "title": "4. live WebSocket connection error capture - handshake rejection captured as evidence",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "api",
+                  "projectName": "api",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 163,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-08T13:14:12.088Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "AI Engine Error Evidence",
+                          "contentType": "application/json",
+                          "body": "ewogICJ0ZXN0IjogIjQuIGxpdmUgV2ViU29ja2V0IGNvbm5lY3Rpb24gZXJyb3IgY2FwdHVyZSAtIGhhbmRzaGFrZSByZWplY3Rpb24gY2FwdHVyZWQgYXMgZXZpZGVuY2UiLAogICJzb3VyY2UiOiAiQUkgRW5naW5lIiwKICAicHJvdG9jb2wiOiAiV2ViU29ja2V0IiwKICAiZW5kcG9pbnQiOiAid3NzOi8vZnVjcjhld3l1ZGpqYnFseGhham9haHBuLjIwMC4yMzQuMzkuMjQzLnNzbGlwLmlvL25vbmV4aXN0ZW50LXdzLWVuZHBvaW50IiwKICAic3RlcCI6ICJsaXZlLXdzLWhhbmRzaGFrZS1mYWlsdXJlIiwKICAidGltZXN0YW1wIjogIjIwMjYtMTAtMDhUMTM6MTQ6MTIuMjQzWiIsCiAgImNvbm5lY3Rpb25TdGF0dXMiOiAicmVqZWN0ZWQiLAogICJoYW5kc2hha2VTdGF0dXMiOiA0MDQsCiAgImNsb3NlQ29kZSI6IG51bGwsCiAgImNsb3NlUmVhc29uIjogIiIsCiAgImVycm9yRnJhbWUiOiBudWxsLAogICJtZXNzYWdlSGlzdG9yeSI6IFtdLAogICJlcnJvciI6ICJVbmV4cGVjdGVkIGhhbmRzaGFrZSByZXNwb25zZTogNDA0IiwKICAiZXhwZWN0ZWQiOiB0cnVlLAogICJjbGFzc2lmaWNhdGlvbiI6ICJBSSBFbmdpbmUiCn0="
+                        },
+                        {
+                          "name": "WebSocket Evidence",
+                          "contentType": "application/json",
+                          "body": "ewogICJlbmRwb2ludCI6ICJ3c3M6Ly9mdWNyOGV3eXVkampicWx4aGFqb2FocG4uMjAwLjIzNC4zOS4yNDMuc3NsaXAuaW8vbm9uZXhpc3RlbnQtd3MtZW5kcG9pbnQiLAogICJzdGVwIjogImxpdmUtd3MtaGFuZHNoYWtlLWZhaWx1cmUiLAogICJjb25uZWN0aW9uU3RhdHVzIjogInJlamVjdGVkIiwKICAiaGFuZHNoYWtlU3RhdHVzIjogNDA0LAogICJjbG9zZUNvZGUiOiBudWxsLAogICJjbG9zZVJlYXNvbiI6ICIiLAogICJlcnJvckZyYW1lIjogbnVsbCwKICAiZXJyb3IiOiAiVW5leHBlY3RlZCBoYW5kc2hha2UgcmVzcG9uc2U6IDQwNCIsCiAgInNvdXJjZSI6ICJBSSBFbmdpbmUiLAogICJleHBlY3RlZCI6IHRydWUKfQ=="
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "e42fb058afcddf2e3f7f-c23bbe6f9233977661dc",
+              "file": "api/specs/ai-engine-error-capture.spec.js",
+              "line": 120,
+              "column": 5
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "websocket\\ai-engine.spec.js",
+      "file": "websocket/ai-engine.spec.js",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "WS /realtime - AI Engine Protocol",
+          "file": "websocket/ai-engine.spec.js",
+          "line": 39,
+          "column": 6,
+          "specs": [
+            {
+              "title": "1. valid connection - opens successfully with valid token and agentId",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [
+                    {
+                      "type": "skip",
+                      "description": "Missing TEST_EMAIL or TEST_PASSWORD in environment. Please configure .env before running authenticated WebSocket tests.",
+                      "location": {
+                        "file": "C:\\Users\\rosha\\OneDrive\\Dokumenty\\Desktop\\CATI\\Testing platform\\Cati-Testing-Platform\\test-engine\\websocket\\fixtures\\ws.fixture.js",
+                        "line": 17,
+                        "column": 22
+                      }
+                    }
+                  ],
+                  "expectedStatus": "skipped",
+                  "projectId": "websocket",
+                  "projectName": "websocket",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 0,
+                      "status": "skipped",
+                      "duration": 6,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-08T13:14:14.011Z",
+                      "annotations": [
+                        {
+                          "type": "skip",
+                          "description": "Missing TEST_EMAIL or TEST_PASSWORD in environment. Please configure .env before running authenticated WebSocket tests.",
+                          "location": {
+                            "file": "C:\\Users\\rosha\\OneDrive\\Dokumenty\\Desktop\\CATI\\Testing platform\\Cati-Testing-Platform\\test-engine\\websocket\\fixtures\\ws.fixture.js",
+                            "line": 17,
+                            "column": 22
+                          }
+                        }
+                      ],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "skipped"
+                }
+              ],
+              "id": "497d63f28484ed073a41-ed9995193748d35239cb",
+              "file": "websocket/ai-engine.spec.js",
+              "line": 40,
+              "column": 5
+            },
+            {
+              "title": "2. invalid authentication - rejects connection with garbage token",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "websocket",
+                  "projectName": "websocket",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 61,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-08T13:14:14.122Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "AI Engine Error Evidence",
+                          "contentType": "application/json",
+                          "body": "ewogICJ0ZXN0IjogIjIuIGludmFsaWQgYXV0aGVudGljYXRpb24gLSByZWplY3RzIGNvbm5lY3Rpb24gd2l0aCBnYXJiYWdlIHRva2VuIiwKICAic291cmNlIjogIkFJIEVuZ2luZSIsCiAgInByb3RvY29sIjogIldlYlNvY2tldCIsCiAgImVuZHBvaW50IjogIndzOi8vbG9jYWxob3N0OjUwMDAvcmVhbHRpbWUiLAogICJzdGVwIjogImludmFsaWQtYXV0aCIsCiAgInRpbWVzdGFtcCI6ICIyMDI2LTEwLTA4VDEzOjE0OjE0LjE2MVoiLAogICJjb25uZWN0aW9uU3RhdHVzIjogInJlamVjdGVkIiwKICAiaGFuZHNoYWtlU3RhdHVzIjogbnVsbCwKICAiY2xvc2VDb2RlIjogbnVsbCwKICAiY2xvc2VSZWFzb24iOiAiIiwKICAiZXJyb3JGcmFtZSI6IG51bGwsCiAgIm1lc3NhZ2VIaXN0b3J5IjogW10sCiAgImVycm9yIjogIkFnZ3JlZ2F0ZUVycm9yIiwKICAiZXhwZWN0ZWQiOiB0cnVlLAogICJjbGFzc2lmaWNhdGlvbiI6ICJBSSBFbmdpbmUiCn0="
+                        },
+                        {
+                          "name": "WebSocket Evidence",
+                          "contentType": "application/json",
+                          "body": "ewogICJlbmRwb2ludCI6ICJ3czovL2xvY2FsaG9zdDo1MDAwL3JlYWx0aW1lIiwKICAic3RlcCI6ICJpbnZhbGlkLWF1dGgiLAogICJjb25uZWN0aW9uU3RhdHVzIjogInJlamVjdGVkIiwKICAiaGFuZHNoYWtlU3RhdHVzIjogbnVsbCwKICAiY2xvc2VDb2RlIjogbnVsbCwKICAiY2xvc2VSZWFzb24iOiAiIiwKICAiZXJyb3JGcmFtZSI6IG51bGwsCiAgImVycm9yIjogIkFnZ3JlZ2F0ZUVycm9yIiwKICAic291cmNlIjogIkFJIEVuZ2luZSIsCiAgImV4cGVjdGVkIjogdHJ1ZQp9"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "497d63f28484ed073a41-00290a0960c93b27be9b",
+              "file": "websocket/ai-engine.spec.js",
+              "line": 83,
+              "column": 5
+            },
+            {
+              "title": "3. missing or invalid agent - rejects or emits error frame",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [
+                    {
+                      "type": "skip",
+                      "description": "Missing TEST_EMAIL or TEST_PASSWORD in environment. Please configure .env before running authenticated WebSocket tests.",
+                      "location": {
+                        "file": "C:\\Users\\rosha\\OneDrive\\Dokumenty\\Desktop\\CATI\\Testing platform\\Cati-Testing-Platform\\test-engine\\websocket\\fixtures\\ws.fixture.js",
+                        "line": 17,
+                        "column": 22
+                      }
+                    }
+                  ],
+                  "expectedStatus": "skipped",
+                  "projectId": "websocket",
+                  "projectName": "websocket",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 0,
+                      "status": "skipped",
+                      "duration": 4,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-08T13:14:14.205Z",
+                      "annotations": [
+                        {
+                          "type": "skip",
+                          "description": "Missing TEST_EMAIL or TEST_PASSWORD in environment. Please configure .env before running authenticated WebSocket tests.",
+                          "location": {
+                            "file": "C:\\Users\\rosha\\OneDrive\\Dokumenty\\Desktop\\CATI\\Testing platform\\Cati-Testing-Platform\\test-engine\\websocket\\fixtures\\ws.fixture.js",
+                            "line": 17,
+                            "column": 22
+                          }
+                        }
+                      ],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "skipped"
+                }
+              ],
+              "id": "497d63f28484ed073a41-b13d11f8ccb7b1e1cb79",
+              "file": "websocket/ai-engine.spec.js",
+              "line": 128,
+              "column": 5
+            },
+            {
+              "title": "4. message / response flow - sending transcript produces response frame",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [
+                    {
+                      "type": "skip",
+                      "description": "Missing TEST_EMAIL or TEST_PASSWORD in environment. Please configure .env before running authenticated WebSocket tests.",
+                      "location": {
+                        "file": "C:\\Users\\rosha\\OneDrive\\Dokumenty\\Desktop\\CATI\\Testing platform\\Cati-Testing-Platform\\test-engine\\websocket\\fixtures\\ws.fixture.js",
+                        "line": 17,
+                        "column": 22
+                      }
+                    }
+                  ],
+                  "expectedStatus": "skipped",
+                  "projectId": "websocket",
+                  "projectName": "websocket",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 0,
+                      "status": "skipped",
+                      "duration": 4,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-08T13:14:14.243Z",
+                      "annotations": [
+                        {
+                          "type": "skip",
+                          "description": "Missing TEST_EMAIL or TEST_PASSWORD in environment. Please configure .env before running authenticated WebSocket tests.",
+                          "location": {
+                            "file": "C:\\Users\\rosha\\OneDrive\\Dokumenty\\Desktop\\CATI\\Testing platform\\Cati-Testing-Platform\\test-engine\\websocket\\fixtures\\ws.fixture.js",
+                            "line": 17,
+                            "column": 22
+                          }
+                        }
+                      ],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "skipped"
+                }
+              ],
+              "id": "497d63f28484ed073a41-e5857181d33c3993bdb3",
+              "file": "websocket/ai-engine.spec.js",
+              "line": 173,
+              "column": 5
+            },
+            {
+              "title": "5. error frame - malformed payload does not crash the server",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [
+                    {
+                      "type": "skip",
+                      "description": "Missing TEST_EMAIL or TEST_PASSWORD in environment. Please configure .env before running authenticated WebSocket tests.",
+                      "location": {
+                        "file": "C:\\Users\\rosha\\OneDrive\\Dokumenty\\Desktop\\CATI\\Testing platform\\Cati-Testing-Platform\\test-engine\\websocket\\fixtures\\ws.fixture.js",
+                        "line": 17,
+                        "column": 22
+                      }
+                    }
+                  ],
+                  "expectedStatus": "skipped",
+                  "projectId": "websocket",
+                  "projectName": "websocket",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 0,
+                      "status": "skipped",
+                      "duration": 4,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-08T13:14:14.290Z",
+                      "annotations": [
+                        {
+                          "type": "skip",
+                          "description": "Missing TEST_EMAIL or TEST_PASSWORD in environment. Please configure .env before running authenticated WebSocket tests.",
+                          "location": {
+                            "file": "C:\\Users\\rosha\\OneDrive\\Dokumenty\\Desktop\\CATI\\Testing platform\\Cati-Testing-Platform\\test-engine\\websocket\\fixtures\\ws.fixture.js",
+                            "line": 17,
+                            "column": 22
+                          }
+                        }
+                      ],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "skipped"
+                }
+              ],
+              "id": "497d63f28484ed073a41-b49c4728d15b1f04a8f8",
+              "file": "websocket/ai-engine.spec.js",
+              "line": 218,
+              "column": 5
+            },
+            {
+              "title": "6. connection close behavior - normal client disconnect produces 1000",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [
+                    {
+                      "type": "skip",
+                      "description": "Missing TEST_EMAIL or TEST_PASSWORD in environment. Please configure .env before running authenticated WebSocket tests.",
+                      "location": {
+                        "file": "C:\\Users\\rosha\\OneDrive\\Dokumenty\\Desktop\\CATI\\Testing platform\\Cati-Testing-Platform\\test-engine\\websocket\\fixtures\\ws.fixture.js",
+                        "line": 17,
+                        "column": 22
+                      }
+                    }
+                  ],
+                  "expectedStatus": "skipped",
+                  "projectId": "websocket",
+                  "projectName": "websocket",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 0,
+                      "status": "skipped",
+                      "duration": 4,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-08T13:14:14.328Z",
+                      "annotations": [
+                        {
+                          "type": "skip",
+                          "description": "Missing TEST_EMAIL or TEST_PASSWORD in environment. Please configure .env before running authenticated WebSocket tests.",
+                          "location": {
+                            "file": "C:\\Users\\rosha\\OneDrive\\Dokumenty\\Desktop\\CATI\\Testing platform\\Cati-Testing-Platform\\test-engine\\websocket\\fixtures\\ws.fixture.js",
+                            "line": 17,
+                            "column": 22
+                          }
+                        }
+                      ],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "skipped"
+                }
+              ],
+              "id": "497d63f28484ed073a41-09af9873ed9c361c523c",
+              "file": "websocket/ai-engine.spec.js",
+              "line": 268,
+              "column": 5
+            },
+            {
+              "title": "7. reconnect behavior - clean close is followed by a working new connection",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [
+                    {
+                      "type": "skip",
+                      "description": "Missing TEST_EMAIL or TEST_PASSWORD in environment. Please configure .env before running authenticated WebSocket tests.",
+                      "location": {
+                        "file": "C:\\Users\\rosha\\OneDrive\\Dokumenty\\Desktop\\CATI\\Testing platform\\Cati-Testing-Platform\\test-engine\\websocket\\fixtures\\ws.fixture.js",
+                        "line": 17,
+                        "column": 22
+                      }
+                    }
+                  ],
+                  "expectedStatus": "skipped",
+                  "projectId": "websocket",
+                  "projectName": "websocket",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 0,
+                      "status": "skipped",
+                      "duration": 3,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-08T13:14:14.394Z",
+                      "annotations": [
+                        {
+                          "type": "skip",
+                          "description": "Missing TEST_EMAIL or TEST_PASSWORD in environment. Please configure .env before running authenticated WebSocket tests.",
+                          "location": {
+                            "file": "C:\\Users\\rosha\\OneDrive\\Dokumenty\\Desktop\\CATI\\Testing platform\\Cati-Testing-Platform\\test-engine\\websocket\\fixtures\\ws.fixture.js",
+                            "line": 17,
+                            "column": 22
+                          }
+                        }
+                      ],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "skipped"
+                }
+              ],
+              "id": "497d63f28484ed073a41-a2c4d5accfd91addfa11",
+              "file": "websocket/ai-engine.spec.js",
+              "line": 284,
+              "column": 5
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-10-08T13:14:08.830Z",
+    "duration": 5850.055,
+    "expected": 5,
+    "skipped": 6,
+    "unexpected": 0,
+    "flaky": 0
+  }
+}

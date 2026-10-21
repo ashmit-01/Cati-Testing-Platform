@@ -1,0 +1,25 @@
+CATI Testing Platform - quick start
+
+1) Backend (terminal 1)
+   cd backend
+   npm install
+   npm run create-admin      <- run once; creates the login
+   npm run dev               <- http://localhost:5001
+
+2) Frontend (terminal 2)
+   cd frontend
+   npm install
+   npm run dev               <- http://localhost:5173
+
+3) Log in at http://localhost:5173
+   Email:    admin@example.com
+   Password: Cati@Admin2026!      (set in backend/.env)
+
+4) Test the AI analysis
+   Test Runs -> start a run (TEST_EXECUTION_MODE=mock produces some failures)
+   -> Failures -> open a failure -> AI Failure Analysis panel
+   PENDING -> COMPLETED (or ERROR with a message + Retry button)
+
+backend/.env contains your real keys. Do NOT upload this folder to GitHub or share it.
+If MongoDB Atlas refuses the connection: Atlas -> Network Access -> allow your IP.
+If Gemini says the model was not found: set LLM_MODEL=gemini-2.5-flash in backend/.env.

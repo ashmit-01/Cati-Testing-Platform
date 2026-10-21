@@ -1,0 +1,48 @@
+{
+  "suites": [
+    {
+      "specs": [
+        {
+          "title": "VOBIZ: handshake - connects and upgrades to 101",
+          "file": "C:\\Users\\madhu\\Downloads\\Cati-Testing-Platform-main (3)\\Cati-Testing-Platform-main\\test-engine\\websocket\\connection.spec.js",
+          "line": 38,
+          "column": 9,
+          "tests": [
+            {
+              "results": [
+                {
+                  "status": "failed",
+                  "duration": 10098,
+                  "retry": 0,
+                  "startTime": "2026-09-29T12:50:12.682Z",
+                  "error": {
+                    "message": "TimeoutError: apiRequestContext.post: Timeout 10000ms exceeded.\nCall log:\n\u001b[2m  - → POST https://backend.usecati.com/api/auth/login\u001b[22m\n\u001b[2m    - user-agent: Playwright/1.63.0 (x64; windows 10.0) node/24.11\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\u001b[2m    - Content-Type: application/json\u001b[22m\n\u001b[2m    - content-length: 56\u001b[22m\n",
+                    "stack": "TimeoutError: apiRequestContext.post: Timeout 10000ms exceeded.\nCall log:\n\u001b[2m  - → POST https://backend.usecati.com/api/auth/login\u001b[22m\n\u001b[2m    - user-agent: Playwright/1.63.0 (x64; windows 10.0) node/24.11\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\u001b[2m    - Content-Type: application/json\u001b[22m\n\u001b[2m    - content-length: 56\u001b[22m\n\n    at obtainAuthToken (C:\\Users\\madhu\\Downloads\\Cati-Testing-Platform-main (3)\\Cati-Testing-Platform-main\\test-engine\\shared\\authToken.helper.js:36:45)\n    at Object.wsAuthToken (C:\\Users\\madhu\\Downloads\\Cati-Testing-Platform-main (3)\\Cati-Testing-Platform-main\\test-engine\\websocket\\fixtures\\ws.fixture.js:16:33)\n    at C:\\Users\\madhu\\Downloads\\Cati-Testing-Platform-main (3)\\Cati-Testing-Platform-main\\node_modules\\playwright\\lib\\worker\\workerProcessEntry.js:190:9)",
+                    "location": {
+                      "file": "C:\\Users\\madhu\\Downloads\\Cati-Testing-Platform-main (3)\\Cati-Testing-Platform-main\\test-engine\\shared\\authToken.helper.js",
+                      "column": 45,
+                      "line": 36
+                    },
+                    "snippet": "\u001b[90m   at \u001b[39mshared\\authToken.helper.js:36\n\n\u001b[0m \u001b[90m 34 |\u001b[39m\n \u001b[90m 35 |\u001b[39m     \u001b[36mtry\u001b[39m {\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 36 |\u001b[39m         \u001b[36mconst\u001b[39m response \u001b[33m=\u001b[39m \u001b[36mawait\u001b[39m loginContext\u001b[33m.\u001b[39mpost(\u001b[32m'/api/auth/login'\u001b[39m\u001b[33m,\u001b[39m {\n \u001b[90m    |\u001b[39m                                             \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 37 |\u001b[39m             data\u001b[33m:\u001b[39m { email\u001b[33m,\u001b[39m password }\u001b[33m,\u001b[39m\n \u001b[90m 38 |\u001b[39m             headers\u001b[33m:\u001b[39m { \u001b[32m'Content-Type'\u001b[39m\u001b[33m:\u001b[39m \u001b[32m'application/json'\u001b[39m }\u001b[33m,\u001b[39m\n \u001b[90m 39 |\u001b[39m         })\u001b[33m;\u001b[39m\u001b[0m"
+                  },
+                  "attachments": [
+                    {
+                      "name": "error-context",
+                      "path": "C:\\Users\\madhu\\Downloads\\Cati-Testing-Platform-main (3)\\Cati-Testing-Platform-main\\test-results\\websocket-connection-WebSo-76b84-onnects-and-upgrades-to-101-websocket\\error-context.md",
+                      "contentType": "text/markdown"
+                    },
+                    {
+                      "name": "trace",
+                      "path": "C:\\Users\\madhu\\Downloads\\Cati-Testing-Platform-main (3)\\Cati-Testing-Platform-main\\test-results\\websocket-connection-WebSo-76b84-onnects-and-upgrades-to-101-websocket\\trace.zip",
+                      "contentType": "application/zip"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
