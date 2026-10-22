@@ -5,6 +5,7 @@ import { generateRunId } from '../utils/idService.js';
 import { runTests } from '../services/testRunnerService.js';
 import { processResults } from '../services/resultService.js';
 import { processFailures } from '../services/failureService.js';
+import { queueFailureAnalysis } from '../services/aiFailureAnalysisService.js';
 import { logger } from '../utils/logger.js';
 
 /**
@@ -17,7 +18,13 @@ async function executeInBackground(runId, environment, { suites, suiteId, testCa
         const outcome = await runTests({ runId, environment, suites, suiteId, testCaseIds });
 
         const { savedResults } = await processResults(runId, outcome.results, environment);
-        await processFailures(savedResults, runId);
+        const failures = await processFailures(savedResults, runId);
+
+        // AI analysis of the failures' text evidence runs in the
+        // background AFTER results and failures are saved. It is not
+        // awaited and cannot throw, so an LLM problem can never fail or
+        // delay the run or erase a saved failure.
+        queueFailureAnalysis(failures);
 
         await TestRun.findOneAndUpdate(
             { runId },

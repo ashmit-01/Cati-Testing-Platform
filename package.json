@@ -5,9 +5,9 @@
   "type": "module",
   "description": "Independent automated QA platform for CATI AI",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview",
+    "dev": "npm --prefix frontend run dev",
+    "build": "npm --prefix frontend run build",
+    "preview": "npm --prefix frontend run preview",
     "test": "playwright test",
     "test:ui": "playwright test --ui",
     "test:report": "playwright show-report",

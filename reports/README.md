@@ -11,9 +11,7 @@ Playwright executes the automated tests and produces:
 - Test status: passed, failed, skipped, timed out
 - Failure information
 - Error stack
-- Screenshot
-- Video
-- Trace
+- Screenshot, video and trace (only when enabled in `playwright.config.js`; currently `off`)
 - Error context
 - Console logs
 - Request metadata
@@ -77,9 +75,7 @@ The reporting layer supports:
 Failure evidence is retained by Playwright and normalized into the QA report.
 Supported evidence includes:
 
-- Screenshot
-- Video
-- Trace
+- Screenshot, video and trace (only when enabled in `playwright.config.js`; currently `off`)
 - Error context
 - Console logs
 - API request metadata
@@ -133,3 +129,5 @@ The GitHub Actions QA workflow runs the same reporting flow and uploads:
 - Failure evidence
 
 Generated reports and evidence are intentionally excluded from Git.
+
+> **AI failure analysis uses text evidence only** (error message, expected/actual, stack trace and log/request/response text). Screenshots, videos and traces are not sent to the LLM.

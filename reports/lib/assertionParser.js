@@ -1,4 +1,6 @@
-import { stripAnsi } from "../../test-engine/shared/aiErrorCapture.js";
+function stripAnsi(text) {
+  return text.replace(/\u001b\[[0-9;]*m/g, "");
+}
 
 export function parseAssertionError(message = "", errorContext = "") {
   const cleanMessage = stripAnsi(message);

@@ -9,6 +9,7 @@ Responsibilities:
 - Test suite APIs (`/api/test-runs`, `/api/results`, `/api/failures`)
 - Result processing and normalization
 - Failure/bug detection, classification, and severity scoring
+- AI failure analysis: probable cause + suggested fix from a failure's text evidence (`services/aiFailureAnalysisService.js`, `POST /api/failures/:id/analyze`)
 - Report APIs (`/api/reports`)
 - QA database integration (MongoDB via Mongoose)
 
@@ -27,7 +28,7 @@ backend/
 ├── models/                   # TestCase, TestSuite, TestRun, TestResult, Failure schemas
 ├── controllers/               # Thin request handlers
 ├── routes/                    # Route -> controller wiring
-├── services/                  # Business logic (runner, results, failures, severity, reports, result checker)
+├── services/                  # Business logic (runner, results, failures, severity, reports, result checker, AI failure analysis)
 ├── middleware/                 # Error handling + request validation
 ├── utils/                      # Logger, async handler, runId generator
 ├── app.js                      # Express app factory
@@ -38,3 +39,8 @@ backend/
 comparator used when a run is driven by stored `TestCase` documents
 (`suiteId`/`testCaseIds` on `POST /api/test-runs`) rather than the legacy
 Playwright-suite-folder path.
+
+## AI failure analysis
+
+`services/aiFailureAnalysisService.js` analyses failed tests using their **text evidence only** (no screenshots, videos or traces). It is triggered from `controllers/testRunController.js` right after `processFailures`, runs in the background, and cannot fail or delay a run. Results are stored on `Failure.aiAnalysis`. Configure it with the `LLM_*` variables in `backend/.env.example`. Tests: `npm test`.
+

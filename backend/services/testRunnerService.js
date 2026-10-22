@@ -17,11 +17,6 @@ import { checkResult } from './resultCheckerService.js';
 import {
     executeTestCaseWithPlaywright
 } from './playwrightCaseExecutor.js';
-import {
-    sanitizeErrorText,
-    parseAssertionDetails,
-    buildLlmErrorContext
-} from '../../test-engine/shared/aiErrorCapture.js';
 
 const __dirname = path.dirname(
     fileURLToPath(import.meta.url)
@@ -199,18 +194,6 @@ function mapPlaywrightStatus(status) {
 // PARSE PLAYWRIGHT JSON
 // ---------------------------------------------------------
 
-function readAttachmentPayload(attachment) {
-    if (!attachment) return null;
-    if (attachment.body) {
-        try {
-            return JSON.parse(Buffer.from(attachment.body, 'base64').toString('utf-8'));
-        } catch {
-            return null;
-        }
-    }
-    return null;
-}
-
 function parsePlaywrightJson(
     json,
     suite,
@@ -236,20 +219,10 @@ function parsePlaywrightJson(
                             test.status
                         );
 
-                    const rawErrorMessage =
+                    const errorMessage =
                         lastResult?.error?.message ||
                         lastResult?.errors?.[0]?.message ||
                         null;
-
-                    const rawStack =
-                        lastResult?.error?.stack ||
-                        lastResult?.errors?.[0]?.stack ||
-                        null;
-
-                    const cleanErrorMessage =
-                        rawErrorMessage
-                            ? sanitizeErrorText(rawErrorMessage, { preserveStack: true })
-                            : null;
 
                     const attachments =
                         lastResult?.attachments || [];
@@ -275,58 +248,6 @@ function parsePlaywrightJson(
                                 'video'
                         )?.path || null;
 
-                    const aiEngineAtt = attachments.find((a) => a.name === 'AI Engine Error Evidence');
-                    const apiCallAtt = attachments.find((a) => a.name === 'API Call Evidence');
-                    const wsAtt = attachments.find((a) => a.name === 'WebSocket Evidence');
-
-                    const aiEngineError = readAttachmentPayload(aiEngineAtt);
-                    const apiCall = readAttachmentPayload(apiCallAtt);
-                    const webSocket = readAttachmentPayload(wsAtt);
-
-                    const assertionDetails = parseAssertionDetails(cleanErrorMessage);
-
-                    const expectedVal =
-                        apiCall?.expectedStatus !== undefined
-                            ? apiCall.expectedStatus
-                            : (assertionDetails.expected !== null ? assertionDetails.expected : null);
-
-                    const actualVal =
-                        apiCall?.actualStatus !== undefined
-                            ? apiCall.actualStatus
-                            : (assertionDetails.actual !== null ? assertionDetails.actual : null);
-
-                    const endpointVal =
-                        apiCall?.endpoint ||
-                        aiEngineError?.endpoint ||
-                        webSocket?.endpoint ||
-                        null;
-
-                    const structuredEvidence = {
-                        screenshot,
-                        trace,
-                        video,
-                        rawError: rawErrorMessage,
-                        rawStack,
-                        ...(apiCall ? { apiCall } : {}),
-                        ...(aiEngineError ? { aiEngineError } : {}),
-                        ...(webSocket ? { webSocket } : {})
-                    };
-
-                    if (status === 'FAIL') {
-                        structuredEvidence.llmContext = buildLlmErrorContext({
-                            testName: spec.title || test.title || path.basename(specFile),
-                            testFile: filePath || specFile || null,
-                            suite,
-                            method: apiCall?.method,
-                            endpoint: endpointVal,
-                            expectedStatus: expectedVal,
-                            actualStatus: actualVal,
-                            error: cleanErrorMessage,
-                            stack: rawStack,
-                            evidence: structuredEvidence
-                        });
-                    }
-
                     results.push({
                         testName:
                             spec.title ||
@@ -340,22 +261,29 @@ function parsePlaywrightJson(
                         duration:
                             lastResult?.duration || 0,
 
-                        error: cleanErrorMessage,
+                        error: errorMessage,
 
-                        rawError: rawErrorMessage,
+                        stackTrace:
+                            lastResult?.error?.stack ||
+                            lastResult?.errors?.[0]?.stack ||
+                            null,
 
-                        expected: expectedVal,
+                        expected: null,
 
-                        actual: actualVal,
+                        actual: null,
 
-                        endpoint: endpointVal,
+                        endpoint: null,
 
                         page:
                             filePath ||
                             specFile ||
                             null,
 
-                        evidence: structuredEvidence
+                        evidence: {
+                            screenshot,
+                            trace,
+                            video
+                        }
                     });
                 }
             }
@@ -519,72 +447,86 @@ async function runSinglePlaywrightSpec({
         }
     );
 
-    
-try {
-    await new Promise(
-        (resolve, reject) => {
-            // Launch Playwright directly through Node.js.
-            // This avoids Windows npx.cmd spawn issues.
-            
-const command = process.execPath;
+    try {
+        await new Promise(
+            (resolve, reject) => {
+                const command =
+                    process.platform === 'win32'
+                        ? 'npx.cmd'
+                        : 'npx';
 
-const playwrightCli = path.join(
-    REPO_ROOT,
-    'node_modules',
-    'playwright',
-    'cli.js'
-);
-
-const targetProject = resolvePlaywrightProject(
-    suite,
-    specFile
-);
-
-// Normalize Windows paths before passing them to Playwright.
-const cliSpecFile = specFile.replace(/\\/g, '/');
-
-const args = [
-    playwrightCli,
-    'test',
-    cliSpecFile,
-    `--project=${targetProject}`,
-    '--reporter=json',
-    '--workers=1',
-    '--timeout=30000'
-];
-
-            logger.info(
-                'Launching individual Playwright spec',
-                {
-                    suite,
+                /*
+                 * IMPORTANT:
+                 *
+                 * This specFile MUST be included here.
+                 *
+                 * Previously the runner created `args`
+                 * containing specFile but then ignored `args`
+                 * and launched the whole Playwright suite.
+                 *
+                 * That is what caused:
+                 *
+                 * agents.spec.js
+                 *      -> Running 41 tests
+                 *
+                 * bulk-calling.spec.js
+                 *      -> Running 41 tests
+                 *
+                 * calls.spec.js
+                 *      -> Running 41 tests
+                 */
+                const targetProject = resolvePlaywrightProject(suite, specFile);
+                const args = [
+                    'playwright',
+                    'test',
                     specFile,
-                    command: `${command} ${args.join(' ')}`,
-                    cwd: REPO_ROOT
-                }
-            );
+                    `--project=${targetProject}`,
+                    '--reporter=json',
+                    '--workers=1',
+                    '--timeout=30000'
+                ];
 
-            const child = spawn(
-                command,
-                args,
-                {
-                    cwd: REPO_ROOT,
+                logger.info(
+                    'Launching individual Playwright spec',
+                    {
+                        suite,
+                        specFile,
+                        command:
+                            `${command} ${args.join(' ')}`,
+                        cwd: REPO_ROOT
+                    }
+                );
 
-                    env: {
-                        ...process.env,
-                        CI: 'true',
-                        TEST_ENV: environment,
-                        PLAYWRIGHT_JSON_OUTPUT_FILE: outputFile,
-                        PLAYWRIGHT_BROWSERS_PATH:
-                            process.env.PLAYWRIGHT_BROWSERS_PATH || '0'
-                    },
+                const child = spawn(
+                    command,
+                    args,
+                    {
+                        cwd: REPO_ROOT,
 
-                    detached: process.platform !== 'win32',
-                    windowsHide: true
-                }
-            );
+                        env: {
+                            ...process.env,
 
-            // Keep your existing event handlers below this point.
-            // Do not duplicate them.
+                            CI: 'true',
+
+                            TEST_ENV:
+                                environment,
+
+                            PLAYWRIGHT_JSON_OUTPUT_FILE:
+                                outputFile,
+
+                            PLAYWRIGHT_BROWSERS_PATH:
+                                process.env
+                                    .PLAYWRIGHT_BROWSERS_PATH ||
+                                '0'
+                        },
+
+                        detached:
+                            process.platform !==
+                            'win32',
+
+                        windowsHide: true
+                    }
+                );
 
                 let stdout = '';
                 let stderr = '';
