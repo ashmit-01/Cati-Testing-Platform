@@ -7,7 +7,6 @@ import FailureTable from '../components/FailureTable.jsx'
 import RunTestsButton from '../components/RunTestsButton.jsx'
 import LoadingState from '../components/LoadingState.jsx'
 import ErrorState from '../components/ErrorState.jsx'
-
 import { getDashboard } from '../services/api.js'
 
 function normalizeSuiteName(suite) {

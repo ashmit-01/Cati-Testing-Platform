@@ -51,12 +51,16 @@ const DEFAULTS = Object.freeze({
         baseUrl: 'https://api.openai.com/v1',
         model: 'gpt-4o-mini'
     },
-    // Google Gemini (native generateContent API)
     gemini: {
         baseUrl: 'https://generativelanguage.googleapis.com/v1beta',
         model: 'gemini-2.5-flash'
+    },
+    groq: {
+        baseUrl: 'https://api.groq.com/openai/v1',
+        model: 'openai/gpt-oss-20b'
     }
 });
+
 
 const MAX_FIELD_CHARS = 4000;
 const MAX_STACK_CHARS = 3000;
@@ -69,29 +73,64 @@ const DEFAULT_MAX_OUTPUT_TOKENS = 2048;
 const STALE_PENDING_MS_FLOOR = 2 * 60 * 1000;
 
 export function getAnalysisConfig() {
-    const provider = (process.env.LLM_PROVIDER || 'anthropic').trim().toLowerCase();
+    const provider = (process.env.LLM_PROVIDER || 'anthropic')
+        .trim()
+        .toLowerCase();
+
     const defaults = DEFAULTS[provider] || DEFAULTS.anthropic;
+
     const timeoutMs = Number.parseInt(process.env.LLM_TIMEOUT_MS, 10);
-    const concurrency = Number.parseInt(process.env.AI_ANALYSIS_CONCURRENCY, 10);
+    const concurrency = Number.parseInt(
+        process.env.AI_ANALYSIS_CONCURRENCY,
+        10
+    );
     const maxTokens = Number.parseInt(process.env.LLM_MAX_TOKENS, 10);
 
     return {
-        enabled: String(process.env.AI_ANALYSIS_ENABLED ?? 'true').toLowerCase() !== 'false',
+        enabled:
+            String(process.env.AI_ANALYSIS_ENABLED ?? 'true').toLowerCase()
+            !== 'false',
+
         provider: DEFAULTS[provider] ? provider : null,
         rawProvider: provider,
+
         apiKey:
             (process.env.LLM_API_KEY || '').trim() ||
-            (provider === 'gemini' ? (process.env.GEMINI_API_KEY || '').trim() : ''),
+            (provider === 'gemini'
+                ? (process.env.GEMINI_API_KEY || '').trim()
+                : provider === 'groq'
+                    ? (process.env.GROQ_API_KEY || '').trim()
+                    : ''),
+
         model:
             (process.env.LLM_MODEL || '').trim() ||
-            (provider === 'gemini' ? (process.env.GEMINI_MODEL || '').trim() : '') ||
+            (provider === 'gemini'
+                ? (process.env.GEMINI_MODEL || '').trim()
+                : '') ||
             defaults.model,
-        baseUrl: ((process.env.LLM_BASE_URL || '').trim() || defaults.baseUrl).replace(/\/+$/, ''),
-        timeoutMs: Number.isFinite(timeoutMs) && timeoutMs > 0 ? timeoutMs : 30000,
-        concurrency: Number.isFinite(concurrency) && concurrency > 0 ? concurrency : 2,
-        maxTokens: Number.isFinite(maxTokens) && maxTokens > 0 ? maxTokens : DEFAULT_MAX_OUTPUT_TOKENS
+
+        baseUrl: (
+            (process.env.LLM_BASE_URL || '').trim() ||
+            defaults.baseUrl
+        ).replace(/\/+$/, ''),
+
+        timeoutMs:
+            Number.isFinite(timeoutMs) && timeoutMs > 0
+                ? timeoutMs
+                : 30000,
+
+        concurrency:
+            Number.isFinite(concurrency) && concurrency > 0
+                ? concurrency
+                : 2,
+
+        maxTokens:
+            Number.isFinite(maxTokens) && maxTokens > 0
+                ? maxTokens
+                : DEFAULT_MAX_OUTPUT_TOKENS
     };
 }
+
 
 function staleAfterMs(config) {
     return Math.max(STALE_PENDING_MS_FLOOR, config.timeoutMs * 2);
@@ -100,17 +139,27 @@ function staleAfterMs(config) {
 /**
  * Returns a human-readable problem if the LLM can't be called, or null.
  */
+
 export function getConfigurationProblem(config = getAnalysisConfig()) {
     if (!config.provider) {
-        return `Unsupported LLM_PROVIDER "${config.rawProvider}". Use "gemini", "anthropic" or "openai".`;
+        return `Unsupported LLM_PROVIDER "${config.rawProvider}". Use "gemini", "anthropic", "openai" or "groq".`;
     }
+
     if (!config.apiKey) {
-        return config.provider === 'gemini'
-            ? 'AI analysis is not configured: set GEMINI_API_KEY (or LLM_API_KEY) in backend/.env.'
-            : 'AI analysis is not configured: LLM_API_KEY is not set on the QA backend.';
+        if (config.provider === 'gemini') {
+            return 'AI analysis is not configured: set GEMINI_API_KEY (or LLM_API_KEY) in backend/.env.';
+        }
+
+        if (config.provider === 'groq') {
+            return 'AI analysis is not configured: set GROQ_API_KEY (or LLM_API_KEY) in backend/.env.';
+        }
+
+        return 'AI analysis is not configured: LLM_API_KEY is not set on the QA backend.';
     }
+
     return null;
 }
+
 
 // ---------------------------------------------------------------------
 // EVIDENCE (TEXT ONLY)
@@ -310,37 +359,60 @@ async function postJson(url, headers, body, timeoutMs) {
 /**
  * Calls the configured provider and returns the model's raw text.
  */
+
 export async function callLLM(prompt, config = getAnalysisConfig()) {
-    if (config.provider === 'openai') {
+    // OpenAI and Groq both use the Chat Completions API format.
+    if (config.provider === 'openai' || config.provider === 'groq') {
         const data = await postJson(
             `${config.baseUrl}/chat/completions`,
-            { Authorization: `Bearer ${config.apiKey}` },
+            {
+                Authorization: `Bearer ${config.apiKey}`
+            },
             {
                 model: config.model,
                 max_tokens: config.maxTokens,
                 temperature: 0,
                 messages: [
-                    { role: 'system', content: SYSTEM_PROMPT },
-                    { role: 'user', content: prompt }
+                    {
+                        role: 'system',
+                        content: SYSTEM_PROMPT
+                    },
+                    {
+                        role: 'user',
+                        content: prompt
+                    }
                 ]
             },
             config.timeoutMs
         );
 
         const text = data?.choices?.[0]?.message?.content;
+
         if (typeof text !== 'string' || !text.trim()) {
-            throw new Error('LLM API response contained no text.');
+            throw new Error(
+                `${config.provider} API response contained no text.`
+            );
         }
+
         return text;
     }
 
     if (config.provider === 'gemini') {
         const data = await postJson(
             `${config.baseUrl}/models/${encodeURIComponent(config.model)}:generateContent`,
-            { 'x-goog-api-key': config.apiKey },
             {
-                systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
-                contents: [{ role: 'user', parts: [{ text: prompt }] }],
+                'x-goog-api-key': config.apiKey
+            },
+            {
+                systemInstruction: {
+                    parts: [{ text: SYSTEM_PROMPT }]
+                },
+                contents: [
+                    {
+                        role: 'user',
+                        parts: [{ text: prompt }]
+                    }
+                ],
                 generationConfig: {
                     temperature: 0,
                     maxOutputTokens: config.maxTokens,
@@ -351,41 +423,71 @@ export async function callLLM(prompt, config = getAnalysisConfig()) {
         );
 
         const text = (data?.candidates?.[0]?.content?.parts || [])
-            .filter((part) => typeof part?.text === 'string' && !part.thought)
+            .filter(
+                (part) =>
+                    typeof part?.text === 'string' && !part.thought
+            )
             .map((part) => part.text)
             .join('\n');
 
         if (!text.trim()) {
             const reason =
-                data?.promptFeedback?.blockReason || data?.candidates?.[0]?.finishReason || 'no text returned';
-            throw new Error(`Gemini API response contained no text (${reason}).`);
+                data?.promptFeedback?.blockReason ||
+                data?.candidates?.[0]?.finishReason ||
+                'no text returned';
+
+            throw new Error(
+                `Gemini API response contained no text (${reason}).`
+            );
         }
+
         return text;
     }
 
-    // anthropic
-    const data = await postJson(
-        `${config.baseUrl}/v1/messages`,
-        { 'x-api-key': config.apiKey, 'anthropic-version': '2023-06-01' },
-        {
-            model: config.model,
-            max_tokens: config.maxTokens,
-            system: SYSTEM_PROMPT,
-            messages: [{ role: 'user', content: prompt }]
-        },
-        config.timeoutMs
-    );
+    if (config.provider === 'anthropic') {
+        const data = await postJson(
+            `${config.baseUrl}/v1/messages`,
+            {
+                'x-api-key': config.apiKey,
+                'anthropic-version': '2023-06-01'
+            },
+            {
+                model: config.model,
+                max_tokens: config.maxTokens,
+                system: SYSTEM_PROMPT,
+                messages: [
+                    {
+                        role: 'user',
+                        content: prompt
+                    }
+                ]
+            },
+            config.timeoutMs
+        );
 
-    const text = (data?.content || [])
-        .filter((block) => block?.type === 'text' && typeof block.text === 'string')
-        .map((block) => block.text)
-        .join('\n');
+        const text = (data?.content || [])
+            .filter(
+                (block) =>
+                    block?.type === 'text' &&
+                    typeof block.text === 'string'
+            )
+            .map((block) => block.text)
+            .join('\n');
 
-    if (!text.trim()) {
-        throw new Error('LLM API response contained no text.');
+        if (!text.trim()) {
+            throw new Error(
+                'Anthropic API response contained no text.'
+            );
+        }
+
+        return text;
     }
-    return text;
+
+    throw new Error(
+        `Unsupported LLM provider: ${config.provider || config.rawProvider}`
+    );
 }
+
 
 // ---------------------------------------------------------------------
 // RESPONSE PARSING

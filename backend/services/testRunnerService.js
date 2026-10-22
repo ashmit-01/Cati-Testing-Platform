@@ -450,41 +450,30 @@ async function runSinglePlaywrightSpec({
     try {
         await new Promise(
             (resolve, reject) => {
-                const command =
-                    process.platform === 'win32'
-                        ? 'npx.cmd'
-                        : 'npx';
+                
+const command = process.execPath;
 
-                /*
-                 * IMPORTANT:
-                 *
-                 * This specFile MUST be included here.
-                 *
-                 * Previously the runner created `args`
-                 * containing specFile but then ignored `args`
-                 * and launched the whole Playwright suite.
-                 *
-                 * That is what caused:
-                 *
-                 * agents.spec.js
-                 *      -> Running 41 tests
-                 *
-                 * bulk-calling.spec.js
-                 *      -> Running 41 tests
-                 *
-                 * calls.spec.js
-                 *      -> Running 41 tests
-                 */
-                const targetProject = resolvePlaywrightProject(suite, specFile);
-                const args = [
-                    'playwright',
-                    'test',
-                    specFile,
-                    `--project=${targetProject}`,
-                    '--reporter=json',
-                    '--workers=1',
-                    '--timeout=30000'
-                ];
+const playwrightCli = path.join(
+    REPO_ROOT,
+    'node_modules',
+    'playwright',
+    'cli.js'
+);
+
+const targetProject = resolvePlaywrightProject(suite, specFile);
+
+const cliSpecFile = specFile.replace(/\\/g, '/');
+
+const args = [
+    playwrightCli,
+    'test',
+    cliSpecFile,
+    `--project=${targetProject}`,
+    '--reporter=json',
+    '--workers=1',
+    '--timeout=30000'
+];
+
 
                 logger.info(
                     'Launching individual Playwright spec',
