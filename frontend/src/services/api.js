@@ -389,6 +389,10 @@ export async function getFailures(
           failure.evidence ||
           {},
 
+        aiAnalysis:
+          failure.aiAnalysis ||
+          null,
+
         createdAt:
           failure.createdAt,
 
@@ -430,6 +434,35 @@ export async function getFailure(id) {
     throw toFriendlyError(
       error,
       'Failed to load this failure. Please check the QA backend connection.'
+    )
+  }
+}
+
+/**
+ * Start (or retry) AI analysis for one failure.
+ *
+ * The backend responds immediately with the analysis in PENDING state and
+ * finishes in the background, so callers should re-fetch the failure
+ * (getFailure) until aiAnalysis.status is COMPLETED or ERROR.
+ */
+export async function analyzeFailure(id) {
+  if (!id || id === 'undefined') {
+    throw new Error(
+      'Invalid failure ID.'
+    )
+  }
+
+  try {
+    const { data } =
+      await api.post(
+        `/api/failures/${encodeURIComponent(id)}/analyze`
+      )
+
+    return data?.aiAnalysis || null
+  } catch (error) {
+    throw toFriendlyError(
+      error,
+      'Failed to start AI analysis. Please check the QA backend connection.'
     )
   }
 }

@@ -40,7 +40,7 @@ cati-test-platform/
 │   ├── websocket/
 │   └── ai/
 ├── reports/              # Generated reports
-├── artifacts/            # Screenshots, traces, videos, etc.
+├── artifacts/            # Test artifacts, if supported by the current implementation
 ├── config/               # Environment/test configuration
 ├── tests/                # Base/smoke tests
 ├── .env.example
@@ -76,6 +76,22 @@ Copy `.env.example` to `.env` and provide authorized test environment credential
 
 Never commit `.env`, passwords, tokens, or API keys.
 
+## Running the dashboard
+
+`frontend/` is the only dashboard source (the older duplicate at the repo root was removed).
+
+```bash
+# terminal 1 - QA backend on port 5001 (needs backend/.env, see backend/.env.example)
+cd backend && npm install
+npm run create-admin     # once: creates the dashboard login from ADMIN_EMAIL / ADMIN_PASSWORD
+npm run dev
+
+# terminal 2 - dashboard on http://localhost:5173
+cd frontend && npm install && npm run dev
+```
+
+The dashboard talks to `http://localhost:5001` by default; override with `VITE_API_BASE_URL` in `frontend/.env`. `npm run dev` at the repo root also starts `frontend/`.
+
 ## Quick Start
 
 ```bash
@@ -89,6 +105,38 @@ View the report:
 ```bash
 npx playwright show-report
 ```
+
+## AI Failure Analysis
+
+When a test fails, the platform sends that failure's **text evidence** to an LLM and shows a **probable cause** and **suggested fix** on the Failure Details page.
+
+**What is analysed (text evidence only):** test name, module (UI / API / E2E / WebSocket / AI-Voice), expected and actual result, error message, stack trace (when the runner provides one), endpoint/page, and any request/response, console, network or WebSocket log text. Obvious secrets (bearer tokens, JWTs, passwords, API keys) are redacted before anything is sent.
+
+**Not supported yet:** screenshot, video and trace analysis. Playwright can capture these, but capture is currently turned `off` in `playwright.config.js`, and they are never sent to the LLM. This is listed as possible future work.
+
+**How it works**
+
+1. A test result is saved as `FAIL` and a `Failure` record is created (existing flow, unchanged).
+2. The failure is queued for analysis in the background (`backend/services/aiFailureAnalysisService.js`). Only failures are analysed; passed tests never reach the LLM.
+3. The analysis is stored on that failure as `aiAnalysis` (`status`: `PENDING` / `COMPLETED` / `ERROR`, `probableCause`, `supportingEvidence`, `suggestedFix`, `confidence`, `additionalInfoNeeded`).
+4. The Failure Details page shows a loading state, the analysis, or the error, with a **Retry analysis** button.
+
+**Safety rules**
+
+- The test status is saved independently of the LLM. If the LLM is down, times out, is not configured, or returns something unusable, the failure stays saved and only `aiAnalysis.status` becomes `ERROR`.
+- The LLM only *suggests*. It never edits code or changes a test or failure status.
+- A failure is analysed once automatically; another LLM call happens only when a user clicks **Retry analysis** (`POST /api/failures/:id/analyze`).
+- If the evidence is thin, the model is instructed to say so and list what is missing instead of guessing. The UI labels the output as a recommendation, not a confirmed root cause.
+
+**Setup** — add to `backend/.env` (see `.env.example`):
+
+```env
+LLM_PROVIDER=anthropic        # or: openai (any OpenAI-compatible API)
+LLM_API_KEY=your-key-here
+# optional: LLM_MODEL, LLM_BASE_URL, LLM_TIMEOUT_MS, AI_ANALYSIS_ENABLED=false
+```
+
+Run the backend tests with `cd backend && npm install && npm test`.
 
 ## Safety
 

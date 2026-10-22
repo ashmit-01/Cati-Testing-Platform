@@ -1,6 +1,5 @@
 import TestResult from '../models/TestResult.js';
 import { logger } from '../utils/logger.js';
-import { sanitizeErrorText } from '../../test-engine/shared/aiErrorCapture.js';
 
 /**
  * Normalizes a single raw result (already close to TestResult shape,
@@ -11,9 +10,6 @@ import { sanitizeErrorText } from '../../test-engine/shared/aiErrorCapture.js';
  * properties (e.g. `endpoint` only makes sense for API suite tests).
  */
 async function saveOne(runId, environment, rawResult) {
-    const cleanError = rawResult.error ? sanitizeErrorText(rawResult.error, { preserveStack: true }) : null;
-    const rawError = rawResult.rawError || (rawResult.error ? String(rawResult.error) : null);
-
     const doc = new TestResult({
         runId,
         testCaseId: rawResult.testCaseId || null,
@@ -22,16 +18,13 @@ async function saveOne(runId, environment, rawResult) {
         environment: environment || null,
         status: rawResult.status,
         duration: rawResult.duration || 0,
-        error: cleanError,
-        rawError: rawError,
+        error: rawResult.error || null,
+        stackTrace: rawResult.stackTrace || null,
         expected: rawResult.expected ?? null,
         actual: rawResult.actual ?? null,
         endpoint: rawResult.endpoint || null,
         page: rawResult.page || null,
-        evidence: {
-            ...(rawResult.evidence || {}),
-            rawError: rawError || undefined
-        }
+        evidence: rawResult.evidence || {}
     });
 
     return doc.save();

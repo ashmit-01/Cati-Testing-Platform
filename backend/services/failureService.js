@@ -1,7 +1,6 @@
 import Failure, { FAILURE_CATEGORY, FAILURE_STATUS } from '../models/Failure.js';
 import { calculateSeverity } from './severityService.js';
 import { logger } from '../utils/logger.js';
-import { sanitizeErrorText, buildLlmErrorContext } from '../../test-engine/shared/aiErrorCapture.js';
 
 /**
  * Best-effort, keyword-based failure classification.
@@ -12,8 +11,7 @@ import { sanitizeErrorText, buildLlmErrorContext } from '../../test-engine/share
  * If nothing matches confidently, category is OTHER rather than a guess.
  */
 export function classifyFailureCategory({ testName = '', suite = '', error = '' } = {}) {
-    const cleanError = sanitizeErrorText(error, { preserveStack: false });
-    const text = `${testName} ${cleanError}`.toLowerCase();
+    const text = `${testName} ${error}`.toLowerCase();
 
     const has = (...needles) => needles.some((needle) => text.includes(needle));
 
@@ -60,21 +58,15 @@ function buildTitleAndDescription(testResult) {
     const title = testResult.testName || 'Unnamed test failed';
     const descriptionParts = [];
 
-    const cleanError = testResult.error
-        ? sanitizeErrorText(testResult.error, { preserveStack: false })
-        : '';
-
     if (testResult.suite) descriptionParts.push(`Suite: ${testResult.suite}`);
     if (testResult.endpoint) descriptionParts.push(`Endpoint: ${testResult.endpoint}`);
     if (testResult.page) descriptionParts.push(`Page: ${testResult.page}`);
-    if (cleanError) descriptionParts.push(`Error: ${cleanError}`);
+    if (testResult.error) descriptionParts.push(`Error: ${testResult.error}`);
     if (testResult.expected !== undefined && testResult.expected !== null) {
-        const expStr = typeof testResult.expected === 'string' ? testResult.expected : JSON.stringify(testResult.expected);
-        descriptionParts.push(`Expected: ${expStr}`);
+        descriptionParts.push(`Expected: ${JSON.stringify(testResult.expected)}`);
     }
     if (testResult.actual !== undefined && testResult.actual !== null) {
-        const actStr = typeof testResult.actual === 'string' ? testResult.actual : JSON.stringify(testResult.actual);
-        descriptionParts.push(`Actual: ${actStr}`);
+        descriptionParts.push(`Actual: ${JSON.stringify(testResult.actual)}`);
     }
 
     return { title, description: descriptionParts.join(' | ') };
@@ -92,22 +84,15 @@ export async function createFailureFromResult(savedTestResult, runId) {
         return null;
     }
 
-    const cleanError = sanitizeErrorText(savedTestResult.error || '', { preserveStack: false });
-    const category = classifyFailureCategory({
-        testName: savedTestResult.testName,
-        suite: savedTestResult.suite,
-        error: cleanError
-    });
+    const category = classifyFailureCategory(savedTestResult);
     const severity = calculateSeverity({
         testName: savedTestResult.testName,
         suite: savedTestResult.suite,
         category,
-        error: cleanError
+        error: savedTestResult.error || ''
     });
 
     const { title, description } = buildTitleAndDescription(savedTestResult);
-    const rawError = savedTestResult.rawError || savedTestResult.error || null;
-    const llmContext = buildLlmErrorContext({ testResult: savedTestResult });
 
     const failure = new Failure({
         runId,
@@ -117,11 +102,7 @@ export async function createFailureFromResult(savedTestResult, runId) {
         severity,
         category,
         status: FAILURE_STATUS.OPEN,
-        evidence: {
-            ...(savedTestResult.evidence || {}),
-            rawError: rawError || undefined,
-            llmContext
-        }
+        evidence: savedTestResult.evidence || {}
     });
 
     await failure.save();

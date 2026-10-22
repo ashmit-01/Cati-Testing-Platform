@@ -98,7 +98,8 @@ Results
   |
   +--> PASS
   |
-  +--> FAIL --> Screenshot / Trace / Video / Logs
+  +--> FAIL --> Text evidence (error, stack, logs) --> AI analysis (text only)
+  |             (Screenshot / Trace / Video only if enabled; not AI-analysed)
   |
   v
 QA Database

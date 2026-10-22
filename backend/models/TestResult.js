@@ -71,7 +71,8 @@ const testResultSchema = new Schema(
         },
         duration: { type: Number, default: 0 },
         error: { type: String, default: null },
-        rawError: { type: String, default: null },
+        // Stack trace text, when the runner provides one (Playwright does).
+        stackTrace: { type: String, default: null },
         expected: { type: Schema.Types.Mixed, default: null },
         actual: { type: Schema.Types.Mixed, default: null },
         endpoint: { type: String, default: null },
