@@ -1,3 +1,4 @@
+
 import { Routes, Route, Navigate } from 'react-router-dom'
 
 import Layout from './components/Layout.jsx'
@@ -10,33 +11,23 @@ import RunDetails from './pages/RunDetails.jsx'
 import Failures from './pages/Failures.jsx'
 import FailureDetails from './pages/FailureDetails.jsx'
 import Reports from './pages/Reports.jsx'
+import AnalyzeError from './pages/AnalyzeError.jsx'
 
 export default function App() {
   return (
     <Routes>
+      {/* Public routes */}
+      <Route
+        path="/login"
+        element={<Login />}
+      />
 
-      {/* =========================
-          PUBLIC ROUTES
-      ========================== */}
-
-      <Route path="/login" element={<Login />} />
-
-
-      {/* =========================
-          PROTECTED ROUTES
-      ========================== */}
-
+      {/* Protected routes */}
       <Route element={<ProtectedRoute />}>
         <Route element={<Layout />}>
-
           <Route
             path="/"
-            element={
-              <Navigate
-                to="/dashboard"
-                replace
-              />
-            }
+            element={<Navigate to="/dashboard" replace />}
           />
 
           <Route
@@ -69,19 +60,19 @@ export default function App() {
             element={<Reports />}
           />
 
+          {/* Manual error analysis */}
           <Route
-            path="*"
-            element={
-              <Navigate
-                to="/dashboard"
-                replace
-              />
-            }
+            path="/analyze-error"
+            element={<AnalyzeError />}
           />
 
+          {/* Redirect unknown routes */}
+          <Route
+            path="*"
+            element={<Navigate to="/dashboard" replace />}
+          />
         </Route>
       </Route>
-
     </Routes>
   )
 }

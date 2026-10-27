@@ -11,6 +11,7 @@ import testCaseRoutes from './testCaseRoutes.js';
 import testSuiteRoutes from './testSuiteRoutes.js';
 
 import { authenticate } from '../middleware/authMiddleware.js';
+import manualErrorAnalysisRoutes from './manualErrorAnalysisRoutes.js';
 
 const router = Router();
 
@@ -51,5 +52,7 @@ router.use('/failures', authenticate, failureRoutes);
 
 // Reports
 router.use('/reports', authenticate, reportRoutes);
+// Manual error analysis
+router.use('/manual-error-analysis', authenticate, manualErrorAnalysisRoutes);
 
 export default router;

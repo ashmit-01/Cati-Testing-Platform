@@ -1,18 +1,29 @@
+
 import { NavLink } from 'react-router-dom'
-import { LayoutDashboard, ListChecks, AlertTriangle, FileBarChart, X, TerminalSquare } from 'lucide-react'
+import {
+  LayoutDashboard,
+  ListChecks,
+  AlertTriangle,
+  FileBarChart,
+  X,
+  TerminalSquare,
+  Sparkles
+} from 'lucide-react'
+
 import EnvironmentBadge from './EnvironmentBadge.jsx'
 
 const NAV_ITEMS = [
   { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/runs', label: 'Test Runs', icon: ListChecks },
   { to: '/failures', label: 'Failures', icon: AlertTriangle },
-  { to: '/reports', label: 'Reports', icon: FileBarChart }
+  { to: '/reports', label: 'Reports', icon: FileBarChart },
+  { to: '/analyze-error', label: 'Analyse Error', icon: Sparkles }
 ]
 
 export default function Sidebar({ open, onClose }) {
   return (
     <>
-      {/* mobile scrim */}
+      {/* Mobile scrim */}
       {open && (
         <div
           className="fixed inset-0 z-30 bg-black/60 lg:hidden"
@@ -31,12 +42,22 @@ export default function Sidebar({ open, onClose }) {
             <div className="flex h-8 w-8 items-center justify-center rounded-md bg-info/15 text-info">
               <TerminalSquare className="h-4 w-4" />
             </div>
+
             <div className="leading-tight">
-              <p className="text-sm font-bold tracking-wide text-primary">CATI QA</p>
-              <p className="text-[11px] text-secondary">Test Platform</p>
+              <p className="text-sm font-bold tracking-wide text-primary">
+                CATI QA
+              </p>
+              <p className="text-[11px] text-secondary">
+                Test Platform
+              </p>
             </div>
           </div>
-          <button onClick={onClose} className="text-secondary hover:text-primary lg:hidden" aria-label="Close menu">
+
+          <button
+            onClick={onClose}
+            className="text-secondary hover:text-primary lg:hidden"
+            aria-label="Close menu"
+          >
             <X className="h-5 w-5" />
           </button>
         </div>
@@ -62,7 +83,9 @@ export default function Sidebar({ open, onClose }) {
         </nav>
 
         <div className="border-t border-border px-5 py-4">
-          <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-secondary">Environment</p>
+          <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-secondary">
+            Environment
+          </p>
           <EnvironmentBadge environment="PRODUCTION" />
         </div>
       </aside>

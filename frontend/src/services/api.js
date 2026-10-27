@@ -645,3 +645,61 @@ export async function getHealth() {
     )
   }
 }
+
+/**
+ * Analyse a manually submitted error message or screenshot.
+ *
+ * @param {{ text?: string, image?: string | null }} payload
+ * @returns {Promise<{
+ *   whatHappened: string,
+ *   whereFrom: string,
+ *   suggestedFix: string,
+ *   confidence: string,
+ *   model?: string
+ * }>}
+ */
+export async function analyzeManualError({ text = '', image = null } = {}) {
+  if (!text.trim() && !image) {
+    throw new Error('Please provide error text or a screenshot.')
+  }
+
+  try {
+    const { data } = await api.post('/api/manual-error-analysis', {
+      text: text.trim(),
+      image
+    })
+
+    // Support either a direct response or a wrapped response.
+    const result = data?.result || data?.analysis || data
+
+    if (
+      !result?.whatHappened ||
+      !result?.whereFrom ||
+      !result?.suggestedFix
+    ) {
+      throw new Error(
+        'The analysis API returned an unexpected response format.'
+      )
+    }
+
+    return {
+      whatHappened: result.whatHappened,
+      whereFrom: result.whereFrom,
+      suggestedFix: result.suggestedFix,
+      confidence: result.confidence || 'Low',
+      model: result.model
+    }
+  } catch (error) {
+    if (
+      error.message ===
+      'The analysis API returned an unexpected response format.'
+    ) {
+      throw error
+    }
+
+    throw toFriendlyError(
+      error,
+      'Failed to analyse the error. Please check the backend connection.'
+    )
+  }
+}
