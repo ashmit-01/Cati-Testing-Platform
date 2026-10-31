@@ -42,11 +42,9 @@ export default defineConfig({
 
     navigationTimeout: 30_000,
 
-    screenshot: 'off',
-
-    video: 'off',
-
-    trace: 'off',
+    screenshot: 'only-on-failure',
+    video: 'retain-on-failure',
+    trace: 'retain-on-failure',
 
     ignoreHTTPSErrors: false,
   },

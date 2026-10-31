@@ -20,7 +20,18 @@ if (!jsonPath) {
 }
 
 console.log("Reading Playwright results from:", jsonPath);
-const json = JSON.parse(fs.readFileSync(jsonPath, "utf-8"));
+let json;
+
+try {
+  json = JSON.parse(fs.readFileSync(jsonPath, "utf-8"));
+} catch (error) {
+  console.error("Failed to parse Playwright JSON report:", error);
+  process.exit(1);
+}
+if (!Array.isArray(json.suites)) {
+  console.error("Invalid Playwright report: suites array is missing.");
+  process.exit(1);
+}
 
 const normalizedResults = [];
 
