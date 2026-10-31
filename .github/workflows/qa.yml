@@ -4,10 +4,12 @@ name: CATI QA
 on:
   push:
     branches:
-      - develop
+      - fix/optimized-test-runner
+
   pull_request:
     branches:
-      - develop
+      - main
+
   workflow_dispatch:
 
 permissions:
