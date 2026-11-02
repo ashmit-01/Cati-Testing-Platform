@@ -64,6 +64,37 @@ jobs:
       - name: Run QA tests
         run: npm run test:qa-report
 
+      # NEW: Send the generated report to the backend
+      - name: Send QA report to staging backend
+        if: always()
+        env:
+          QA_INGEST_URL: ${{ secrets.QA_INGEST_URL }}
+          CI_INGESTION_TOKEN: ${{ secrets.CI_INGESTION_TOKEN }}
+        shell: bash
+        run: |
+          REPORT="reports/generated/qa-report.json"
+
+          if [ ! -f "$REPORT" ]; then
+            echo "::warning::QA report was not generated."
+            exit 0
+          fi
+
+          if [ -z "$QA_INGEST_URL" ] || [ -z "$CI_INGESTION_TOKEN" ]; then
+            echo "::error::Missing CI ingestion secrets."
+            exit 1
+          fi
+
+          echo "Sending QA report to staging backend..."
+
+          curl --fail-with-body --silent --show-error \
+            --request POST \
+            --url "$QA_INGEST_URL" \
+            --header "Authorization: Bearer $CI_INGESTION_TOKEN" \
+            --header "Content-Type: application/json" \
+            --data-binary "@$REPORT"
+
+          echo "QA report sent successfully."
+
       - name: Upload Playwright report
         if: always()
         uses: actions/upload-artifact@v4
