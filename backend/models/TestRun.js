@@ -65,6 +65,15 @@ const testRunSchema = new Schema(
             type: String,
             default: 'unknown'
         },
+        ci: {
+        provider: { type: String, default: null },
+        workflow: { type: String, default: null },
+        branch: { type: String, default: null },
+        commit: { type: String, default: null },
+        runNumber: { type: String, default: null },
+        runId: { type: String, default: null },
+        runUrl: { type: String, default: null }
+        },
         error: {
             // Populated only if the run failed unexpectedly (crash, not a
             // normal test FAIL).
@@ -73,6 +82,15 @@ const testRunSchema = new Schema(
         }
     },
     { timestamps: true }
+);
+testRunSchema.index(
+    { 'ci.runId': 1 },
+    {
+        unique: true,
+        partialFilterExpression: {
+            'ci.runId': { $type: 'string' }
+        }
+    }
 );
 
 export default mongoose.model('TestRun', testRunSchema);

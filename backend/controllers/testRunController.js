@@ -7,6 +7,7 @@ import { processResults } from '../services/resultService.js';
 import { processFailures } from '../services/failureService.js';
 import { queueFailureAnalysis } from '../services/aiFailureAnalysisService.js';
 import { logger } from '../utils/logger.js';
+import { adaptCiReport } from '../services/ciResultAdapter.js';
 
 /**
  * Runs the full test execution pipeline in the background and updates the
@@ -148,4 +149,140 @@ export const getTestRunById = asyncHandler(async (req, res) => {
         run,
         recentFailures
     });
+});
+
+/**
+ * POST /api/test-runs/ci
+ * Receives a completed Playwright report from GitHub Actions.
+ * Authenticated separately using the CI ingestion token.
+ */
+export const ingestCiReport = asyncHandler(async (req, res) => {
+    const report = req.body;
+    const ci = report?.ci || {};
+
+    // GitHub Actions run ID is required for duplicate protection.
+    if (!ci.runId) {
+        throw new ApiError(400, 'Missing CI metadata: ci.runId is required.');
+    }
+
+    // Validate and convert the Playwright report to our internal format.
+    const adapted = adaptCiReport(report);
+
+    // Avoid importing the same GitHub Actions run more than once.
+    const existingRun = await TestRun.findOne({ 'ci.runId': String(ci.runId) })
+        .select('runId status')
+        .lean();
+
+    if (existingRun) {
+        throw new ApiError(
+            409,
+            `GitHub Actions run "${ci.runId}" has already been imported.`
+        );
+    }
+
+    const runId = await generateRunId();
+    const startedAt = new Date();
+
+    const results = adapted.results;
+
+    const summary = {
+        totalTests: results.length,
+        passed: results.filter((item) => item.status === 'PASS').length,
+        failed: results.filter((item) => item.status === 'FAIL').length,
+        skipped: results.filter((item) => item.status === 'SKIPPED').length
+    };
+
+    const totalDuration = results.reduce(
+        (total, item) => total + (Number(item.duration) || 0),
+        0
+    );
+
+    const testRun = await TestRun.create({
+        runId,
+        environment: adapted.environment,
+        suites: [...new Set(results.map((item) => item.suite))],
+        status: TEST_RUN_STATUS.RUNNING,
+        startedAt,
+        executionMode: 'playwright-ci',
+        ci: {
+            provider: 'github-actions',
+            workflow: ci.workflow || null,
+            branch: ci.branch || null,
+            commit: ci.commit || null,
+            runNumber: ci.runNumber != null ? String(ci.runNumber) : null,
+            runId: String(ci.runId),
+            runUrl: ci.runUrl || null
+        }
+    });
+
+    try {
+        // Save all normalized test results.
+        const { savedResults } = await processResults(
+            runId,
+            results,
+            adapted.environment
+        );
+
+        // Do not report a successful ingestion if some results were not saved.
+        if (savedResults.length !== results.length) {
+            throw new Error(
+                `Result persistence incomplete: expected ${results.length}, saved ${savedResults.length}.`
+            );
+        }
+
+        // Create Failure documents for failed test results.
+        const failures = await processFailures(savedResults, runId);
+
+        // Queue AI analysis without delaying the ingestion response.
+        queueFailureAnalysis(failures);
+
+        await TestRun.findOneAndUpdate(
+            { runId },
+            {
+                status: TEST_RUN_STATUS.COMPLETED,
+                completedAt: new Date(),
+                totalTests: summary.totalTests,
+                passed: summary.passed,
+                failed: summary.failed,
+                skipped: summary.skipped,
+                duration: totalDuration
+            }
+        );
+
+        logger.info('GitHub Actions test run imported', {
+            runId,
+            githubRunId: String(ci.runId),
+            ...summary
+        });
+
+        return res.status(201).json({
+            success: true,
+            message: 'CI test report imported successfully.',
+            run: {
+                runId,
+                status: TEST_RUN_STATUS.COMPLETED,
+                environment: adapted.environment,
+                ...summary,
+                duration: totalDuration,
+                ci: testRun.ci
+            }
+        });
+    } catch (error) {
+        await TestRun.findOneAndUpdate(
+            { runId },
+            {
+                status: TEST_RUN_STATUS.FAILED,
+                completedAt: new Date(),
+                error: error.message
+            }
+        );
+
+        logger.error('GitHub Actions report ingestion failed', {
+            runId,
+            githubRunId: String(ci.runId),
+            message: error.message
+        });
+
+        throw error;
+    }
 });

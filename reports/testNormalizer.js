@@ -62,8 +62,27 @@ console.log("Normalized results:", normalizedResults.length);
 const summary = buildReportSummary(normalizedResults);
 const report = {
   generatedAt: new Date().toISOString(),
+
   environment: process.env.TEST_ENV || "unknown",
   url: process.env.FRONTEND_URL || null,
+
+  // GitHub Actions metadata
+  ci: {
+    provider: "github-actions",
+    workflow: process.env.GITHUB_WORKFLOW || null,
+    branch: process.env.GITHUB_REF_NAME || null,
+    commit: process.env.GITHUB_SHA || null,
+    runNumber: process.env.GITHUB_RUN_NUMBER || null,
+    runId: process.env.GITHUB_RUN_ID || null,
+
+    runUrl:
+      process.env.GITHUB_SERVER_URL &&
+      process.env.GITHUB_REPOSITORY &&
+      process.env.GITHUB_RUN_ID
+        ? `${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}`
+        : null,
+  },
+
   summary,
   results: normalizedResults,
 };

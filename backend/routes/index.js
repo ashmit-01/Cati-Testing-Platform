@@ -7,6 +7,8 @@ import testRunRoutes from './testRunRoutes.js';
 import resultRoutes from './resultRoutes.js';
 import failureRoutes from './failureRoutes.js';
 import reportRoutes from './reportRoutes.js';
+import { authenticateCi } from '../middleware/authenticateCi.js';
+import { ingestCiReport } from '../controllers/testRunController.js';
 import testCaseRoutes from './testCaseRoutes.js';
 import testSuiteRoutes from './testSuiteRoutes.js';
 
@@ -40,6 +42,9 @@ router.use('/test-cases', authenticate, testCaseRoutes);
 
 // Test suites
 router.use('/test-suites', authenticate, testSuiteRoutes);
+
+// GitHub Actions CI report ingestion
+router.post('/test-runs/ci', authenticateCi, ingestCiReport);
 
 // Test runs
 router.use('/test-runs', authenticate, testRunRoutes);
