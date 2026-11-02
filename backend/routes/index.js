@@ -14,6 +14,7 @@ import testSuiteRoutes from './testSuiteRoutes.js';
 
 import { authenticate } from '../middleware/authMiddleware.js';
 import manualErrorAnalysisRoutes from './manualErrorAnalysisRoutes.js';
+import { triggerGitHubWorkflow } from '../controllers/ciController.js';
 
 const router = Router();
 
@@ -42,6 +43,9 @@ router.use('/test-cases', authenticate, testCaseRoutes);
 
 // Test suites
 router.use('/test-suites', authenticate, testSuiteRoutes);
+
+// Trigger GitHub Actions (admin only)
+router.post('/ci/trigger', authenticate, triggerGitHubWorkflow);
 
 // GitHub Actions CI report ingestion
 router.post('/test-runs/ci', authenticateCi, ingestCiReport);
