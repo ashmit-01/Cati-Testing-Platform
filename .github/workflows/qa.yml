@@ -11,6 +11,19 @@ on:
       - main
 
   workflow_dispatch:
+    inputs:
+      test_suite:
+        description: "Select the test suite to execute"
+        required: true
+        type: choice
+        default: all
+        options:
+          - all
+          - ui
+          - api
+          - e2e
+          - websocket
+          - ai-voice
 
 permissions:
   contents: read
@@ -28,6 +41,8 @@ jobs:
     env:
       CI: "true"
       TEST_ENV: staging
+      TEST_SUITE: ${{ inputs.test_suite || 'all' }}
+
       FRONTEND_URL: ${{ secrets.FRONTEND_URL }}
       BACKEND_URL: ${{ secrets.BACKEND_URL }}
       AI_ENGINE_URL: ${{ secrets.AI_ENGINE_URL }}
@@ -61,10 +76,15 @@ jobs:
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
 
+      - name: Display selected test suite
+        run: |
+          echo "Selected test suite: $TEST_SUITE"
+
       - name: Run QA tests
         run: npm run test:qa-report
+        env:
+          TEST_SUITE: ${{ env.TEST_SUITE }}
 
-      # NEW: Send the generated report to the backend
       - name: Send QA report to staging backend
         if: always()
         env:

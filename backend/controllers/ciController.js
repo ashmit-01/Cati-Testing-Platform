@@ -1,4 +1,14 @@
+
 const GITHUB_API = 'https://api.github.com';
+
+const ALLOWED_TEST_SUITES = [
+    'all',
+    'ui',
+    'api',
+    'e2e',
+    'websocket',
+    'ai-voice'
+];
 
 export async function triggerGitHubWorkflow(req, res) {
     try {
@@ -10,7 +20,7 @@ export async function triggerGitHubWorkflow(req, res) {
             GITHUB_BRANCH
         } = process.env;
 
-        // Validate configuration
+        // Validate GitHub configuration
         const missing = [];
 
         if (!GITHUB_PAT) missing.push('GITHUB_PAT');
@@ -26,9 +36,28 @@ export async function triggerGitHubWorkflow(req, res) {
             });
         }
 
+        // Get selected test suite
+        const testSuite = String(req.body?.testSuite || 'all')
+            .trim()
+            .toLowerCase();
+
+        // Validate test suite
+        if (!ALLOWED_TEST_SUITES.includes(testSuite)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid test suite selected.',
+                allowedSuites: ALLOWED_TEST_SUITES
+            });
+        }
+
         const url =
             `${GITHUB_API}/repos/${GITHUB_OWNER}/${GITHUB_REPO}` +
             `/actions/workflows/${GITHUB_WORKFLOW_ID}/dispatches`;
+
+        console.log('Triggering CATI QA workflow:', {
+            branch: GITHUB_BRANCH,
+            testSuite
+        });
 
         const response = await fetch(url, {
             method: 'POST',
@@ -39,7 +68,10 @@ export async function triggerGitHubWorkflow(req, res) {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-                ref: GITHUB_BRANCH
+                ref: GITHUB_BRANCH,
+                inputs: {
+                    test_suite: testSuite
+                }
             })
         });
 
@@ -60,7 +92,8 @@ export async function triggerGitHubWorkflow(req, res) {
 
         return res.status(202).json({
             success: true,
-            message: 'GitHub Actions workflow triggered successfully.',
+            message: `${testSuite.toUpperCase()} tests triggered successfully.`,
+            testSuite,
             workflowUrl:
                 `https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}` +
                 `/actions/workflows/${GITHUB_WORKFLOW_ID}`,

@@ -1,3 +1,4 @@
+
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -23,6 +24,16 @@ const normalizerPath = path.resolve(
     'reports',
     'testNormalizer.js'
 );
+
+// Available test suites and their directories.
+const TEST_SUITES = {
+    all: null,
+    ui: 'test-engine/ui',
+    api: 'test-engine/api',
+    e2e: 'test-engine/e2e',
+    websocket: 'test-engine/websocket',
+    'ai-voice': 'test-engine/ai'
+};
 
 function runProcess(args) {
     return new Promise((resolve) => {
@@ -61,16 +72,58 @@ async function main() {
         throw new Error(`Normalizer not found: ${normalizerPath}`);
     }
 
-    // Remove the previous report so we never normalize stale results.
+    // Read selected suite from environment.
+    const selectedSuite = (
+        process.env.TEST_SUITE || 'all'
+    ).trim().toLowerCase();
+
+    if (!Object.hasOwn(TEST_SUITES, selectedSuite)) {
+        throw new Error(
+            `Invalid TEST_SUITE: "${selectedSuite}". ` +
+            `Available options: ${Object.keys(TEST_SUITES).join(', ')}`
+        );
+    }
+
+    const selectedDirectory = TEST_SUITES[selectedSuite];
+
+    console.log('Selected test suite:', selectedSuite);
+
+    // Build Playwright command.
+    const playwrightArgs = [
+        playwrightCli,
+        'test'
+    ];
+
+    if (selectedDirectory) {
+        const testPath = path.resolve(
+            projectRoot,
+            selectedDirectory
+        );
+
+        if (!fs.existsSync(testPath)) {
+            throw new Error(
+                `Test directory not found: ${testPath}`
+            );
+        }
+
+        playwrightArgs.push(selectedDirectory);
+
+        console.log('Executing directory:', selectedDirectory);
+    } else {
+        console.log('Executing all Playwright tests.');
+    }
+
+    // Remove previous reports to prevent stale results.
     if (fs.existsSync(reportPath)) {
         fs.unlinkSync(reportPath);
     }
 
-    const playwrightExitCode = await runProcess([
-        playwrightCli,
-        'test'
-    ]);
+    // Execute selected Playwright tests.
+    console.log('\n========== EXECUTING PLAYWRIGHT TESTS ==========\n');
 
+    const playwrightExitCode = await runProcess(playwrightArgs);
+
+    // Normalize generated JSON report.
     console.log('\n========== NORMALIZING TEST RESULTS ==========\n');
 
     let normalizerExitCode = 1;
@@ -80,10 +133,15 @@ async function main() {
             normalizerPath
         ]);
     } else {
-        console.error(`Playwright JSON report not found: ${reportPath}`);
+        console.error(
+            `Playwright JSON report not found: ${reportPath}`
+        );
     }
 
+    // Final summary.
     console.log('\n========== QA RUN SUMMARY ==========\n');
+
+    console.log('Selected suite:', selectedSuite);
     console.log('Playwright exit code:', playwrightExitCode);
     console.log('Normalizer exit code:', normalizerExitCode);
 
