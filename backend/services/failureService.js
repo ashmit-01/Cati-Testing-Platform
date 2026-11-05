@@ -85,6 +85,7 @@ export async function createFailureFromResult(savedTestResult, runId) {
     }
 
     const category = classifyFailureCategory(savedTestResult);
+
     const severity = calculateSeverity({
         testName: savedTestResult.testName,
         suite: savedTestResult.suite,
@@ -94,27 +95,36 @@ export async function createFailureFromResult(savedTestResult, runId) {
 
     const { title, description } = buildTitleAndDescription(savedTestResult);
 
-    const failure = new Failure({
-        runId,
-        testResultId: savedTestResult._id,
-        title,
-        description,
-        severity,
-        category,
-        status: FAILURE_STATUS.OPEN,
-        evidence: savedTestResult.evidence || {}
-    });
+    try {
+        return await Failure.findOneAndUpdate(
+            { testResultId: savedTestResult._id },
+            {
+                $setOnInsert: {
+                    runId,
+                    testResultId: savedTestResult._id,
+                    title,
+                    description,
+                    severity,
+                    category,
+                    status: FAILURE_STATUS.OPEN,
+                    evidence: savedTestResult.evidence || {}
+                }
+            },
+            {
+                upsert: true,
+                new: true,
+                runValidators: true
+            }
+        );
+    } catch (error) {
+        if (error.code === 11000) {
+            return await Failure.findOne({
+                testResultId: savedTestResult._id
+            });
+        }
 
-    await failure.save();
-
-    logger.info('Failure recorded', {
-        runId,
-        testName: savedTestResult.testName,
-        severity,
-        category
-    });
-
-    return failure;
+        throw error;
+    }
 }
 
 /**

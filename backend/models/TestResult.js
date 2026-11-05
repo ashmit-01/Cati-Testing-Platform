@@ -70,6 +70,17 @@ const testResultSchema = new Schema(
             index: true
         },
         duration: { type: Number, default: 0 },
+        retryCount: {
+    type: Number,
+    default: 0,
+    min: 0
+},
+
+totalAttempts: {
+    type: Number,
+    default: 1,
+    min: 1
+},
         error: { type: String, default: null },
         // Stack trace text, when the runner provides one (Playwright does).
         stackTrace: { type: String, default: null },

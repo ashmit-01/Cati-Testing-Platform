@@ -1,3 +1,4 @@
+
 import mongoose from 'mongoose';
 
 const { Schema } = mongoose;
@@ -40,11 +41,8 @@ export const AI_ANALYSIS_CONFIDENCE = Object.freeze({
 });
 
 /**
- * LLM-generated analysis of a failure's TEXT evidence. This is a
- * recommendation only: it never changes the failure's status or the
- * linked TestResult, and an analysis error never affects the failure.
- *
- * `status` is null until analysis has been requested for the failure.
+ * LLM-generated analysis of a failure's evidence.
+ * Analysis is advisory and never changes the failure status.
  */
 const aiAnalysisSchema = new Schema(
     {
@@ -61,7 +59,6 @@ const aiAnalysisSchema = new Schema(
             enum: Object.values(AI_ANALYSIS_CONFIDENCE),
             default: null
         },
-        // Filled when the evidence was too thin for a confident answer.
         additionalInfoNeeded: { type: String, default: null },
         error: { type: String, default: null },
         provider: { type: String, default: null },
@@ -80,41 +77,72 @@ const failureSchema = new Schema(
             required: true,
             index: true
         },
+
         testResultId: {
             type: Schema.Types.ObjectId,
             ref: 'TestResult',
             required: true
         },
+
         title: {
             type: String,
             required: true
         },
+
         description: {
             type: String,
             default: ''
         },
+
         severity: {
             type: String,
             enum: Object.values(FAILURE_SEVERITY),
             required: true,
             index: true
         },
+
         category: {
             type: String,
             enum: Object.values(FAILURE_CATEGORY),
             default: FAILURE_CATEGORY.OTHER,
             index: true
         },
+
         status: {
             type: String,
             enum: Object.values(FAILURE_STATUS),
             default: FAILURE_STATUS.OPEN,
             index: true
         },
-        evidence: { type: Schema.Types.Mixed, default: () => ({}) },
-        aiAnalysis: { type: aiAnalysisSchema, default: () => ({}) }
+
+        evidence: {
+            type: Schema.Types.Mixed,
+            default: () => ({})
+        },
+
+        aiAnalysis: {
+            type: aiAnalysisSchema,
+            default: () => ({})
+        }
     },
-    { timestamps: { createdAt: true, updatedAt: false } }
+    {
+        timestamps: {
+            createdAt: true,
+            updatedAt: false
+        }
+    }
+);
+
+/**
+ * Prevent multiple Failure documents from referencing
+ * the same TestResult.
+ */
+failureSchema.index(
+    { testResultId: 1 },
+    {
+        unique: true,
+        name: 'unique_failure_per_test_result'
+    }
 );
 
 export default mongoose.model('Failure', failureSchema);

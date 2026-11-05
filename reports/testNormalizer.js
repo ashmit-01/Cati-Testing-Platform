@@ -41,9 +41,20 @@ function walkSuite(node) {
   if (node.specs) {
     for (const spec of node.specs) {
       for (const test of spec.tests || []) {
-        for (const result of test.results || []) {
-          normalizedResults.push(normalizeTestResult(spec, result));
-        }
+        const attempts = test.results || [];
+
+        if (attempts.length === 0) continue;
+
+        // Keep only the final attempt for dashboard reporting.
+        const finalAttempt = attempts[attempts.length - 1];
+
+        const normalized = normalizeTestResult(spec, finalAttempt);
+
+        // Preserve retry information for detailed reporting.
+        normalized.retryCount = Math.max(0, attempts.length - 1);
+        normalized.totalAttempts = attempts.length;
+
+        normalizedResults.push(normalized);
       }
     }
   }
