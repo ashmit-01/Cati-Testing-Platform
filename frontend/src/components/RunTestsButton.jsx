@@ -1,71 +1,77 @@
-
-import { useState } from 'react'
+import { useState } from "react";
+import { Link } from "react-router-dom";
 import {
   Play,
   Loader2,
   GitBranch,
   ExternalLink,
-  ChevronDown
-} from 'lucide-react'
-import { api } from '../services/api.js'
+  ChevronDown,
+} from "lucide-react";
+import { api } from "../services/api.js";
 
 const TEST_SUITES = [
-  { label: 'All Tests', value: 'all' },
-  { label: 'UI Tests', value: 'ui' },
-  { label: 'API Tests', value: 'api' },
-  { label: 'E2E Tests', value: 'e2e' },
-  { label: 'WebSocket Tests', value: 'websocket' },
-  { label: 'AI / Voice Tests', value: 'ai-voice' }
-]
+  { label: "All Tests", value: "all" },
+  { label: "UI Tests", value: "ui" },
+  { label: "API Tests", value: "api" },
+  { label: "E2E Tests", value: "e2e" },
+  { label: "WebSocket Tests", value: "websocket" },
+  { label: "AI / Voice Tests", value: "ai-voice" },
+];
 
-export default function RunTestsButton({ className = '' }) {
-  const [status, setStatus] = useState('idle')
-  const [message, setMessage] = useState('')
-  const [runUrl, setRunUrl] = useState('')
-  const [testSuite, setTestSuite] = useState('all')
+export default function RunTestsButton({ className = "", onRunStarted }) {
+  const [status, setStatus] = useState("idle");
+  const [message, setMessage] = useState("");
+  const [runUrl, setRunUrl] = useState("");
+  const [runId, setRunId] = useState("");
+  const [testSuite, setTestSuite] = useState("all");
 
   async function handleRunTests() {
-    if (status === 'starting') return
+    if (status === "starting") return;
 
-    setStatus('starting')
-    setMessage('')
-    setRunUrl('')
+    setStatus("starting");
+    setMessage("");
+    setRunUrl("");
+    setRunId("");
 
     try {
-      const { data } = await api.post('/api/ci/trigger', {
-        testSuite
-      })
+      const { data } = await api.post("/api/ci/trigger", {
+        testSuite,
+      });
 
-      setStatus('success')
+      setStatus("success");
       setMessage(
-        data.message || 'GitHub Actions workflow triggered successfully.'
-      )
+        data.message || "GitHub Actions workflow triggered successfully.",
+      );
 
       if (data.workflowUrl) {
-    setRunUrl(data.workflowUrl)
-}
-    } catch (error) {
-      console.error('GitHub Actions trigger failed:', error)
+        setRunUrl(data.workflowUrl);
+      }
 
-      setStatus('error')
+      if (data.runId) {
+        setRunId(data.runId);
+        onRunStarted?.(data.runId);
+      }
+    } catch (error) {
+      console.error("GitHub Actions trigger failed:", error);
+
+      setStatus("error");
       setMessage(
         error.response?.data?.message ||
-        error.message ||
-        'Unable to trigger GitHub Actions.'
-      )
+          error.message ||
+          "Unable to trigger GitHub Actions.",
+      );
     }
   }
 
   return (
     <div className={className}>
       <div className="flex flex-wrap items-center gap-3">
-
         {/* Test Suite Selection */}
         <div className="relative">
           <select
             value={testSuite}
             onChange={(e) => setTestSuite(e.target.value)}
-            disabled={status === 'starting'}
+            disabled={status === "starting"}
             className="appearance-none rounded-md border border-border bg-card px-4 py-2.5 pr-10 text-sm font-medium text-foreground outline-none focus:border-info disabled:opacity-60"
           >
             {TEST_SUITES.map((suite) => (
@@ -82,10 +88,10 @@ export default function RunTestsButton({ className = '' }) {
         <button
           type="button"
           onClick={handleRunTests}
-          disabled={status === 'starting'}
+          disabled={status === "starting"}
           className="inline-flex items-center gap-2 rounded-md bg-info px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-info/90 disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {status === 'starting' ? (
+          {status === "starting" ? (
             <>
               <Loader2 className="h-4 w-4 animate-spin" />
               Triggering GitHub Actions...
@@ -104,12 +110,21 @@ export default function RunTestsButton({ className = '' }) {
       {message && (
         <div
           className={`mt-3 rounded-md border px-3 py-2 text-sm ${
-            status === 'error'
-              ? 'border-failure/30 bg-failure/10 text-failure'
-              : 'border-success/30 bg-success/10 text-success'
+            status === "error"
+              ? "border-failure/30 bg-failure/10 text-failure"
+              : "border-success/30 bg-success/10 text-success"
           }`}
         >
           {message}
+
+          {runId && (
+            <Link
+              to={`/runs/${encodeURIComponent(runId)}`}
+              className="ml-2 inline-flex items-center gap-1 font-medium underline"
+            >
+              View live progress
+            </Link>
+          )}
 
           {runUrl && (
             <a
@@ -118,12 +133,12 @@ export default function RunTestsButton({ className = '' }) {
               rel="noopener noreferrer"
               className="ml-2 inline-flex items-center gap-1 font-medium underline"
             >
-              View GitHub Run
+              View GitHub Actions
               <ExternalLink className="h-3 w-3" />
             </a>
           )}
         </div>
       )}
     </div>
-  )
+  );
 }
