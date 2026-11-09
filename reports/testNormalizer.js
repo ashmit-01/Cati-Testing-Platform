@@ -15,7 +15,10 @@ const candidatePaths = [
 let jsonPath = candidatePaths.find((p) => fs.existsSync(p));
 
 if (!jsonPath) {
-  console.error("No Playwright results JSON found in candidate locations:", candidatePaths);
+  console.error(
+    "No Playwright results JSON found in candidate locations:",
+    candidatePaths,
+  );
   process.exit(1);
 }
 
@@ -74,6 +77,7 @@ const report = {
     commit: process.env.GITHUB_SHA || null,
     runNumber: process.env.GITHUB_RUN_NUMBER || null,
     runId: process.env.GITHUB_RUN_ID || null,
+    platformRunId: process.env.PLATFORM_RUN_ID || null,
 
     runUrl:
       process.env.GITHUB_SERVER_URL &&
