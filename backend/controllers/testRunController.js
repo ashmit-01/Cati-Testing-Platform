@@ -10,8 +10,10 @@ import { queueFailureAnalysis } from "../services/aiFailureAnalysisService.js";
 import { logger } from "../utils/logger.js";
 import { adaptCiReport } from "../services/ciResultAdapter.js";
 import { updateTestRunProgress } from "../services/testRunProgressService.js";
-import { cancelGitHubWorkflow } from "../services/githubActionsService.js";
 import {
+  cancelGitHubWorkflow,
+  getGitHubWorkflowRun,
+} from "../services/githubActionsService.js";import {
   buildTestRunLog,
   getTestLogExpiresAt,
   isTestLogAvailable,
@@ -151,28 +153,139 @@ export const createTestRun = asyncHandler(async (req, res) => {
  * GET /api/test-runs?environment=&status=
  * Returns recent runs first.
  */
+
+
+async function syncGitHubRunStatus(run) {
+  try {
+    const githubRun = await getGitHubWorkflowRun(run.ci.runId);
+
+    // GitHub has not finished this workflow yet.
+    if (githubRun.status !== "completed") {
+      return;
+    }
+
+    let finalStatus;
+
+    if (githubRun.conclusion === "cancelled") {
+      finalStatus = TEST_RUN_STATUS.CANCELLED;
+    } else if (githubRun.conclusion === "success") {
+      finalStatus = TEST_RUN_STATUS.COMPLETED;
+    } else {
+      // Includes failure, timed_out, startup_failure, etc.
+      finalStatus = TEST_RUN_STATUS.FAILED;
+    }
+
+    const completedAt = new Date();
+
+    const update = {
+      status: finalStatus,
+      completedAt,
+      estimatedRemainingMs: null,
+      etaAt: null,
+      lastProgressAt: completedAt,
+    };
+
+    if (finalStatus === TEST_RUN_STATUS.CANCELLED) {
+      update.cancelledAt = completedAt;
+    }
+
+    if (finalStatus === TEST_RUN_STATUS.COMPLETED) {
+      update.progressPercent = 100;
+      update.estimatedRemainingMs = 0;
+    }
+
+    if (finalStatus === TEST_RUN_STATUS.FAILED) {
+      update.error = `GitHub Actions concluded with: ${githubRun.conclusion || "unknown"}`;
+    }
+
+    // Only update if another process has not already finalized this run.
+    const updated = await TestRun.findOneAndUpdate(
+      {
+        runId: run.runId,
+        "ci.runId": String(githubRun.id),
+        status: {
+          $in: [
+            TEST_RUN_STATUS.RUNNING,
+            TEST_RUN_STATUS.CANCELLING,
+          ],
+        },
+      },
+      { $set: update },
+      { new: true }
+    );
+
+    if (updated) {
+      logger.info("GitHub Actions status synchronized", {
+        runId: run.runId,
+        githubRunId: githubRun.id,
+        status: finalStatus,
+        conclusion: githubRun.conclusion,
+      });
+    }
+  } catch (error) {
+    // A temporary GitHub API error must not break the dashboard.
+    logger.warn("Could not synchronize GitHub Actions status", {
+      runId: run.runId,
+      githubRunId: run.ci?.runId,
+      message: error.message,
+    });
+  }
+}
+
+
 export const listTestRuns = asyncHandler(async (req, res) => {
   const { environment, status } = req.query;
   const filter = {};
+
   if (environment) filter.environment = environment;
   if (status) filter.status = status.toUpperCase();
 
   const limit = Math.min(parseInt(req.query.limit, 10) || 50, 200);
 
-  const runs = await TestRun.find(filter)
+  let runs = await TestRun.find(filter)
+    .sort({ startedAt: -1 })
+    .limit(limit)
+    .lean();
+
+  // Synchronize up to 20 recent active GitHub Actions runs.
+  const activeGitHubRuns = runs
+    .filter(
+      (run) =>
+        run.executionMode === "playwright-ci" &&
+        run.ci?.provider === "github-actions" &&
+        run.ci?.runId &&
+        [
+          TEST_RUN_STATUS.RUNNING,
+          TEST_RUN_STATUS.CANCELLING,
+        ].includes(run.status)
+    )
+    .slice(0, 20);
+
+  await Promise.all(
+    activeGitHubRuns.map((run) => syncGitHubRunStatus(run))
+  );
+
+  // Read again so the response contains the latest MongoDB statuses.
+  runs = await TestRun.find(filter)
     .sort({ startedAt: -1 })
     .limit(limit)
     .lean();
 
   const now = new Date();
+
   const runsWithLogStatus = runs.map((run) => ({
     ...run,
     logExpiresAt: getTestLogExpiresAt(run),
     logAvailable: isTestLogAvailable(run, now),
   }));
 
-  res.json({ success: true, count: runs.length, runs: runsWithLogStatus });
+  res.json({
+    success: true,
+    count: runs.length,
+    runs: runsWithLogStatus,
+  });
 });
+
 
 /**
  * GET /api/test-runs/:id
