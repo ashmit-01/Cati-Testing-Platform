@@ -12,6 +12,7 @@ import Failures from './pages/Failures.jsx'
 import FailureDetails from './pages/FailureDetails.jsx'
 import Reports from './pages/Reports.jsx'
 import AnalyzeError from './pages/AnalyzeError.jsx'
+import TestCases from './pages/TestCases.jsx'
 
 export default function App() {
   return (
@@ -58,6 +59,11 @@ export default function App() {
           <Route
             path="/reports"
             element={<Reports />}
+          />
+
+          <Route
+            path="/test-cases"
+            element={<TestCases />}
           />
 
           {/* Manual error analysis */}

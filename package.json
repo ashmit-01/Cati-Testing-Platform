@@ -5,7 +5,7 @@
   "type": "module",
   "description": "Independent automated QA platform for CATI AI",
   "scripts": {
-    "dev": "npm --prefix frontend run dev",
+    "dev": "npm --prefix frontend run dev -- --host",
     "build": "npm --prefix frontend run build",
     "preview": "npm --prefix frontend run preview",
     "test": "playwright test",
