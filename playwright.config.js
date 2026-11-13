@@ -1,8 +1,32 @@
-import { defineConfig } from '@playwright/test';
-import 'dotenv/config';
+import { defineConfig } from "@playwright/test";
+import "dotenv/config";
+
+const reporters = [
+  ["list"],
+  [
+    "json",
+    {
+      outputFile:
+        process.env.PLAYWRIGHT_JSON_OUTPUT_FILE || "playwright-results.json",
+    },
+  ],
+  [
+    "html",
+    {
+      outputFolder: "playwright-report",
+      open: "never",
+    },
+  ],
+];
+
+// The dashboard-triggered workflow supplies PLATFORM_RUN_ID. Local Playwright
+// runs and manually dispatched workflows without that input remain unchanged.
+if (process.env.PLATFORM_RUN_ID) {
+  reporters.push(["./reports/progressReporter.js"]);
+}
 
 export default defineConfig({
-  testDir: './test-engine',
+  testDir: "./test-engine",
 
   // Run sequentially on Render for stability.
   workers: 1,
@@ -18,23 +42,10 @@ export default defineConfig({
 
   retries: process.env.CI ? 1 : 0,
 
-  reporter: [
-    ['list'],
-    ['json', {
-      outputFile:
-        process.env.PLAYWRIGHT_JSON_OUTPUT_FILE ||
-        'playwright-results.json',
-    }],
-    ['html', {
-      outputFolder: 'playwright-report',
-      open: 'never',
-    }],
-  ],
+  reporter: reporters,
 
   use: {
-    baseURL:
-      process.env.FRONTEND_URL ||
-      'https://usecati.com',
+    baseURL: process.env.FRONTEND_URL || "https://usecati.com",
 
     headless: true,
 
@@ -42,9 +53,9 @@ export default defineConfig({
 
     navigationTimeout: 30_000,
 
-    screenshot: 'only-on-failure',
-    video: 'retain-on-failure',
-    trace: 'retain-on-failure',
+    screenshot: "only-on-failure",
+    video: "retain-on-failure",
+    trace: "retain-on-failure",
 
     ignoreHTTPSErrors: false,
   },
@@ -54,16 +65,14 @@ export default defineConfig({
     // AUTH SETUP
     // -------------------------------------------------
     {
-      name: 'setup',
+      name: "setup",
 
       testMatch: /auth\.setup\.js/,
 
       use: {
-        baseURL:
-          process.env.FRONTEND_URL ||
-          'https://usecati.com',
+        baseURL: process.env.FRONTEND_URL || "https://usecati.com",
 
-        browserName: 'chromium',
+        browserName: "chromium",
 
         headless: true,
 
@@ -75,51 +84,43 @@ export default defineConfig({
     // AUTHENTICATED UI TESTS
     // -------------------------------------------------
     {
-      name: 'chromium',
+      name: "chromium",
 
       testMatch: /.*\.spec\.js/,
 
       testIgnore: [
-        '**/login.spec.js',
-        '**/landing.spec.js',
-        '**/api/**',
-        '**/websocket/**',
-        '**/ai/**',
+        "**/login.spec.js",
+        "**/landing.spec.js",
+        "**/api/**",
+        "**/websocket/**",
+        "**/ai/**",
       ],
 
       use: {
-        browserName: 'chromium',
+        browserName: "chromium",
 
-        baseURL:
-          process.env.FRONTEND_URL ||
-          'https://usecati.com',
+        baseURL: process.env.FRONTEND_URL || "https://usecati.com",
 
-        storageState:
-          'playwright/.auth/user.json',
+        storageState: "playwright/.auth/user.json",
 
         headless: true,
       },
 
-      dependencies: ['setup'],
+      dependencies: ["setup"],
     },
 
     // -------------------------------------------------
     // UNAUTHENTICATED UI TESTS
     // -------------------------------------------------
     {
-      name: 'unauthenticated',
+      name: "unauthenticated",
 
-      testMatch: [
-        '**/login.spec.js',
-        '**/landing.spec.js',
-      ],
+      testMatch: ["**/login.spec.js", "**/landing.spec.js"],
 
       use: {
-        browserName: 'chromium',
+        browserName: "chromium",
 
-        baseURL:
-          process.env.FRONTEND_URL ||
-          'https://usecati.com',
+        baseURL: process.env.FRONTEND_URL || "https://usecati.com",
 
         storageState: undefined,
 
@@ -131,20 +132,17 @@ export default defineConfig({
     // API TESTS
     // -------------------------------------------------
     {
-      name: 'api',
+      name: "api",
 
-      testMatch:
-        /api[\\/]specs[\\/].*\.spec\.js/,
+      testMatch: /api[\\/]specs[\\/].*\.spec\.js/,
 
       use: {
-        baseURL:
-          process.env.BACKEND_URL ||
-          'http://localhost:5000',
+        baseURL: process.env.BACKEND_URL || "http://localhost:5000",
       },
     },
 
     {
-      name: 'websocket',
+      name: "websocket",
 
       // Pure Node WebSocket protocol tests (no browser/page needed) -
       // kept out of the 'chromium' project so they don't depend on the
@@ -152,19 +150,19 @@ export default defineConfig({
       testMatch: /(^|[\\/])websocket[\\/].*\.spec\.js/,
 
       use: {
-        baseURL: process.env.BACKEND_URL || 'http://localhost:5000',
+        baseURL: process.env.BACKEND_URL || "http://localhost:5000",
       },
     },
 
     {
-      name: 'ai',
+      name: "ai",
 
       // AI/voice behavioral tests drive the AI engine over REST
       // (test-engine/api/helpers/aiEngine.helper.js), not a browser.
       testMatch: /(^|[\\/])ai[\\/].*\.spec\.js/,
 
       use: {
-        baseURL: process.env.BACKEND_URL || 'http://localhost:5000',
+        baseURL: process.env.BACKEND_URL || "http://localhost:5000",
       },
     },
   ],

@@ -8,7 +8,11 @@ import resultRoutes from './resultRoutes.js';
 import failureRoutes from './failureRoutes.js';
 import reportRoutes from './reportRoutes.js';
 import { authenticateCi } from '../middleware/authenticateCi.js';
-import { ingestCiReport } from '../controllers/testRunController.js';
+import {
+  ingestCiReport,
+  reportCiProgress,
+  reportCiFailure,
+} from "../controllers/testRunController.js";
 import testCaseRoutes from './testCaseRoutes.js';
 import testSuiteRoutes from './testSuiteRoutes.js';
 
@@ -49,6 +53,19 @@ router.post('/ci/trigger', authenticate, triggerGitHubWorkflow);
 
 // GitHub Actions CI report ingestion
 router.post('/test-runs/ci', authenticateCi, ingestCiReport);
+// Live progress updates from GitHub Actions
+router.post(
+    '/test-runs/:runId/progress',
+    authenticateCi,
+    reportCiProgress
+);
+
+// Failure notification from GitHub Actions
+router.post(
+    '/test-runs/:runId/failure',
+    authenticateCi,
+    reportCiFailure
+);
 
 // Test runs
 router.use('/test-runs', authenticate, testRunRoutes);

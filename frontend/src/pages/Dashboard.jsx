@@ -1,44 +1,37 @@
-import { useEffect, useState, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useEffect, useState, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 
-import StatCard from '../components/StatCard.jsx'
-import SuiteTable from '../components/SuiteTable.jsx'
-import FailureTable from '../components/FailureTable.jsx'
-import RunTestsButton from '../components/RunTestsButton.jsx'
-import LoadingState from '../components/LoadingState.jsx'
-import ErrorState from '../components/ErrorState.jsx'
-import { getDashboard } from '../services/api.js'
+import StatCard from "../components/StatCard.jsx";
+import SuiteTable from "../components/SuiteTable.jsx";
+import FailureTable from "../components/FailureTable.jsx";
+import RunTestsButton from "../components/RunTestsButton.jsx";
+import LoadingState from "../components/LoadingState.jsx";
+import ErrorState from "../components/ErrorState.jsx";
+import { getDashboard } from "../services/api.js";
 
 function normalizeSuiteName(suite) {
   if (!suite) {
-    return 'Unknown'
+    return "Unknown";
   }
 
-  const value = String(suite).toUpperCase()
+  const value = String(suite).toUpperCase();
 
-  if (value === 'AI_VOICE') {
-    return 'AI / Voice'
+  if (value === "AI_VOICE") {
+    return "AI / Voice";
   }
 
-  if (value === 'WEBSOCKET') {
-    return 'WebSocket'
+  if (value === "WEBSOCKET") {
+    return "WebSocket";
   }
 
-  return value
+  return value;
 }
 
 function normalizeFailure(failure) {
   return {
-    id:
-      failure.id ||
-      failure._id ||
-      failure.testResultId,
+    id: failure.id || failure._id || failure.testResultId,
 
-    test:
-      failure.test ||
-      failure.testName ||
-      failure.title ||
-      'Unnamed test',
+    test: failure.test || failure.testName || failure.title || "Unnamed test",
 
     /*
      * IMPORTANT:
@@ -46,292 +39,153 @@ function normalizeFailure(failure) {
      * Suite comes from TestResult.suite.
      * Do NOT fall back to category here.
      */
-    suite:
-      normalizeSuiteName(
-        failure.suite
-      ),
+    suite: normalizeSuiteName(failure.suite),
 
-    severity:
-      failure.severity ||
-      'MEDIUM',
+    severity: failure.severity || "MEDIUM",
 
-    status:
-      failure.status ||
-      'OPEN',
+    status: failure.status || "OPEN",
 
-    category:
-      failure.category ||
-      'OTHER',
+    category: failure.category || "OTHER",
 
-    description:
-      failure.description ||
-      'No failure description available.',
+    description: failure.description || "No failure description available.",
 
-    expected:
-      failure.expected ??
-      null,
+    expected: failure.expected ?? null,
 
-    actual:
-      failure.actual ??
-      null,
+    actual: failure.actual ?? null,
 
-    endpoint:
-      failure.endpoint ??
-      null,
+    endpoint: failure.endpoint ?? null,
 
-    page:
-      failure.page ??
-      null,
+    page: failure.page ?? null,
 
-    evidence:
-      failure.evidence ||
-      {}
-  }
+    evidence: failure.evidence || {},
+  };
 }
 
 export default function Dashboard() {
-  const navigate = useNavigate()
+  const navigate = useNavigate();
 
   const [state, setState] = useState({
-    status: 'loading',
+    status: "loading",
     data: null,
-    error: null
-  })
+    error: null,
+  });
 
-  const [failures, setFailures] = useState([])
+  const [failures, setFailures] = useState([]);
 
-  const load = useCallback(
-    async () => {
-      try {
-        setState((previous) => ({
-          ...previous,
-          status:
-            previous.data
-              ? 'success'
-              : 'loading',
-          error: null
-        }))
+  const load = useCallback(async () => {
+    try {
+      setState((previous) => ({
+        ...previous,
+        status: previous.data ? "success" : "loading",
+        error: null,
+      }));
 
-        const response =
-          await getDashboard()
+      const response = await getDashboard();
 
-        console.log(
-          'Dashboard API response:',
-          response
-        )
+      console.log("Dashboard API response:", response);
 
-        const dashboard =
-          response?.dashboard ||
-          response ||
-          {}
+      const dashboard = response?.dashboard || response || {};
 
-        setState({
-          status: 'success',
-          data: dashboard,
-          error: null
-        })
+      setState({
+        status: "success",
+        data: dashboard,
+        error: null,
+      });
 
-        const recentFailures =
-          Array.isArray(
-            dashboard.recentFailures
-          )
-            ? dashboard.recentFailures
-            : []
+      const recentFailures = Array.isArray(dashboard.recentFailures)
+        ? dashboard.recentFailures
+        : [];
 
-        setFailures(
-          recentFailures
-            .slice(0, 4)
-            .map(normalizeFailure)
-        )
-      } catch (error) {
-        console.error(
-          'Dashboard loading error:',
-          error
-        )
+      setFailures(recentFailures.slice(0, 4).map(normalizeFailure));
+    } catch (error) {
+      console.error("Dashboard loading error:", error);
 
-        setState((previous) => ({
-          status:
-            previous.data
-              ? 'success'
-              : 'error',
+      setState((previous) => ({
+        status: previous.data ? "success" : "error",
 
-          data:
-            previous.data,
+        data: previous.data,
 
-          error:
-            error?.message ||
-            'Please check the QA backend connection.'
-        }))
-      }
-    },
-    []
-  )
+        error: error?.message || "Please check the QA backend connection.",
+      }));
+    }
+  }, []);
 
   useEffect(() => {
-    load()
-  }, [load])
+    load();
+  }, [load]);
 
   /*
    * Refresh dashboard periodically so new test runs and
    * failure records appear without manually refreshing.
    */
   useEffect(() => {
-    const interval =
-      setInterval(
-        load,
-        5000
-      )
+    const interval = setInterval(load, 5000);
 
     return () => {
-      clearInterval(interval)
-    }
-  }, [load])
+      clearInterval(interval);
+    };
+  }, [load]);
 
-  if (
-    state.status ===
-      'loading' &&
-    !state.data
-  ) {
-    return (
-      <LoadingState
-        label="Loading dashboard..."
-      />
-    )
+  if (state.status === "loading" && !state.data) {
+    return <LoadingState label="Loading dashboard..." />;
   }
 
-  if (
-    state.status ===
-      'error' &&
-    !state.data
-  ) {
+  if (state.status === "error" && !state.data) {
     return (
       <ErrorState
         title="Unable to load dashboard data."
-        message={
-          state.error ||
-          'Please check the QA backend connection.'
-        }
+        message={state.error || "Please check the QA backend connection."}
         onRetry={load}
       />
-    )
+    );
   }
 
-  const d =
-    state.data || {}
+  const d = state.data || {};
 
   // ------------------------------------------------------------
   // Latest run
   // ------------------------------------------------------------
 
-  const recentRuns =
-    Array.isArray(
-      d.recentRuns
-    )
-      ? d.recentRuns
-      : []
+  const recentRuns = Array.isArray(d.recentRuns) ? d.recentRuns : [];
 
-  const lastRun =
-    recentRuns.length > 0
-      ? recentRuns[0]
-      : null
+  const lastRun = recentRuns.length > 0 ? recentRuns[0] : null;
 
   // ------------------------------------------------------------
   // Suites
   // ------------------------------------------------------------
 
-  const suites =
-    Array.isArray(
-      d.suites
-    )
-      ? d.suites.map(
-          (suite, index) => ({
-            ...suite,
+  const suites = Array.isArray(d.suites)
+    ? d.suites.map((suite, index) => ({
+        ...suite,
 
-            id:
-              suite.id ||
-              suite._id ||
-              suite.name ||
-              `suite-${index}`,
+        id: suite.id || suite._id || suite.name || `suite-${index}`,
 
-            name:
-              suite.name ||
-              suite.suite ||
-              'Unknown',
+        name: suite.name || suite.suite || "Unknown",
 
-            total:
-              Number(
-                suite.total ??
-                suite.totalTests ??
-                0
-              ),
+        total: Number(suite.total ?? suite.totalTests ?? 0),
 
-            passed:
-              Number(
-                suite.passed ??
-                suite.passedTests ??
-                0
-              ),
+        passed: Number(suite.passed ?? suite.passedTests ?? 0),
 
-            failed:
-              Number(
-                suite.failed ??
-                suite.failedTests ??
-                0
-              )
-          })
-        )
-      : []
+        failed: Number(suite.failed ?? suite.failedTests ?? 0),
+      }))
+    : [];
 
   // ------------------------------------------------------------
   // Statistics
   // ------------------------------------------------------------
 
-  const totalTests =
-    Number(
-      d.totalTests ??
-      d.total ??
-      0
-    )
+  const totalTests = Number(d.totalTests ?? d.total ?? 0);
 
-  const passedTests =
-    Number(
-      d.passedTests ??
-      d.passed ??
-      0
-    )
+  const passedTests = Number(d.passedTests ?? d.passed ?? 0);
 
-  const failedTests =
-    Number(
-      d.failedTests ??
-      d.failed ??
-      0
-    )
+  const failedTests = Number(d.failedTests ?? d.failed ?? 0);
 
-  const skippedTests =
-    Number(
-      d.skippedTests ??
-      d.skipped ??
-      0
-    )
+  const skippedTests = Number(d.skippedTests ?? d.skipped ?? 0);
 
   const calculatedPassRate =
-    totalTests > 0
-      ? Number(
-          (
-            (
-              passedTests /
-              totalTests
-            ) *
-            100
-          ).toFixed(2)
-        )
-      : 0
+    totalTests > 0 ? Number(((passedTests / totalTests) * 100).toFixed(2)) : 0;
 
-  const passRate =
-    Number(
-      d.passRate ??
-      calculatedPassRate
-    )
+  const passRate = Number(d.passRate ?? calculatedPassRate);
 
   // ------------------------------------------------------------
   // Render
@@ -339,61 +193,38 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-8">
-
       {/* ====================================================== */}
       {/* LAST RUN + RUN TESTS */}
       {/* ====================================================== */}
 
       <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-
         <div>
-
           {lastRun ? (
             <p className="text-sm text-secondary">
-
-              Last run{' '}
-
+              Last run{" "}
               <button
                 onClick={() => {
-
-                  const runId =
-                    lastRun.runId ||
-                    lastRun.id
+                  const runId = lastRun.runId || lastRun.id;
 
                   if (runId) {
-                    navigate(
-                      `/runs/${runId}`
-                    )
+                    navigate(`/runs/${runId}`);
                   }
                 }}
                 className="font-medium text-info hover:underline"
               >
-                #
-                {lastRun.runId ||
-                  lastRun.id}
+                #{lastRun.runId || lastRun.id}
               </button>
-
-              {' · '}
-
-              {lastRun.startedAt ||
-              lastRun.date
-                ? new Date(
-                    lastRun.startedAt ||
-                    lastRun.date
-                  ).toLocaleString()
-                : 'Unknown date'}
-
+              {" · "}
+              {lastRun.startedAt || lastRun.date
+                ? new Date(lastRun.startedAt || lastRun.date).toLocaleString()
+                : "Unknown date"}
             </p>
           ) : (
-            <p className="text-sm text-secondary">
-              No test runs yet
-            </p>
+            <p className="text-sm text-secondary">No test runs yet</p>
           )}
-
         </div>
 
-        <RunTestsButton />
-
+        <RunTestsButton onRunStarted={() => load()} />
       </div>
 
       {/* ====================================================== */}
@@ -401,31 +232,24 @@ export default function Dashboard() {
       {/* ====================================================== */}
 
       <section>
+        <div className="mb-3">
+          <h2 className="text-sm font-semibold text-primary">
+            Today's execution statistics
+          </h2>
+          <p className="mt-1 text-xs text-secondary">
+            Counts reset at midnight in {d.reportingTimeZone || "Asia/Kolkata"}{" "}
+            · {d.reportingDate || "Today"}
+          </p>
+        </div>
 
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
+          <StatCard label="Total Tests" value={totalTests} />
 
-          <StatCard
-            label="Total Tests"
-            value={totalTests}
-          />
+          <StatCard label="Passed" value={passedTests} accent="success" />
 
-          <StatCard
-            label="Passed"
-            value={passedTests}
-            accent="success"
-          />
+          <StatCard label="Failed" value={failedTests} accent="failure" />
 
-          <StatCard
-            label="Failed"
-            value={failedTests}
-            accent="failure"
-          />
-
-          <StatCard
-            label="Skipped"
-            value={skippedTests}
-            accent="warning"
-          />
+          <StatCard label="Skipped" value={skippedTests} accent="warning" />
 
           <StatCard
             label="Pass Rate"
@@ -433,9 +257,7 @@ export default function Dashboard() {
             suffix="%"
             accent="info"
           />
-
         </div>
-
       </section>
 
       {/* ====================================================== */}
@@ -443,29 +265,25 @@ export default function Dashboard() {
       {/* ====================================================== */}
 
       <section className="space-y-3">
-
         <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-sm font-semibold text-primary">Test Suites</h2>
+            <p className="mt-1 text-xs text-secondary">
+              Daily execution totals · {d.reportingDate || "Today"} (
+              {d.reportingTimeZone || "Asia/Kolkata"})
+            </p>
+          </div>
 
-          <h2 className="text-sm font-semibold text-primary">
-            Test Suites
-          </h2>
-
-          <span className="text-xs text-secondary">
-            {suites.length} suites
-          </span>
-
+          <span className="text-xs text-secondary">{suites.length} suites</span>
         </div>
 
         {suites.length > 0 ? (
-          <SuiteTable
-            suites={suites}
-          />
+          <SuiteTable suites={suites} />
         ) : (
           <div className="rounded-lg border border-border bg-card px-4 py-8 text-center text-sm text-secondary">
             No suite data available.
           </div>
         )}
-
       </section>
 
       {/* ====================================================== */}
@@ -473,11 +291,8 @@ export default function Dashboard() {
       {/* ====================================================== */}
 
       <section className="space-y-3">
-
         <div className="flex items-center justify-between">
-
           <div>
-
             <h2 className="text-sm font-semibold text-primary">
               Recent Failures
             </h2>
@@ -485,51 +300,38 @@ export default function Dashboard() {
             <p className="mt-1 text-xs text-secondary">
               Latest recorded test failures
             </p>
-
           </div>
 
           <button
-            onClick={() =>
-              navigate('/failures')
-            }
+            onClick={() => navigate("/failures")}
             className="text-xs font-medium text-info hover:underline"
           >
             View all
           </button>
-
         </div>
 
         {failures.length > 0 ? (
-          <FailureTable
-            failures={failures}
-          />
+          <FailureTable failures={failures} />
         ) : failedTests > 0 ? (
           <div className="rounded-lg border border-border bg-card p-8 text-center">
-
             <p className="text-sm font-medium text-primary">
-              {failedTests} tests have failed,
-              but no recent failure details
+              {failedTests} tests have failed, but no recent failure details
               were returned.
             </p>
 
             <button
-              onClick={() =>
-                navigate('/failures')
-              }
+              onClick={() => navigate("/failures")}
               className="mt-4 rounded-md border border-border px-4 py-2 text-xs font-medium text-primary hover:border-info hover:text-info"
             >
               Open Failures
             </button>
-
           </div>
         ) : (
           <div className="rounded-lg border border-border bg-card p-8 text-center text-sm text-secondary">
             No test failures found.
           </div>
         )}
-
       </section>
-
     </div>
-  )
+  );
 }
