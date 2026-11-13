@@ -58,6 +58,13 @@ const testCaseSchema = new Schema(
             type: Schema.Types.Mixed,
             default: null
         },
+        definition: {
+            // Declarative type-specific actions/assertions authored by the UI.
+            // Execution adapters are introduced separately; storing this now
+            // keeps UI-created cases intact.
+            type: Schema.Types.Mixed,
+            default: null
+        },
         expectedResult: {
             type: Schema.Types.Mixed,
             required: true

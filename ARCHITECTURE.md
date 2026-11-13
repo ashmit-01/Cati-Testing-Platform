@@ -108,7 +108,41 @@ QA Database
 Dashboard / Reports
 ```
 
-## 4. Failure Model
+## 4. Test Case Authoring
+
+Test cases are stored in the QA database. UI/E2E cases hold a declarative
+`definition` (`actions` + `assertions`) that the runner replays with Playwright.
+
+UI cases can be authored two ways:
+
+```text
+Local machine                               Deployed QA platform
+-------------                               --------------------
+npm run record -- <url>                     Dashboard > Test Cases > Import
+  |                                           |
+  | real browser, user performs the flow      | review in the test case designer
+  | steps captured (click/type/select/Enter)  v
+  v                                         QA Backend --> QA Database
+<case-id>.cati.json  -- upload ------------>   |
+(autosaved on browser close)                   v
+                                           Test Runner replays actions,
+                                           then checks assertions
+```
+
+- Recording happens only on the tester's machine. The backend has no recorder,
+  so it stays deployable on serverless platforms.
+- The recorder (`backend/scripts/record.js`, `backend/services/recorderCore.js`)
+  needs only `@playwright/test` and Chrome/Edge or Chromium. It does not need
+  the backend, database or `.env`.
+- Start page and navigation steps are saved as paths (e.g. `/login`), so the
+  runner resolves them against its own `FRONTEND_URL`.
+- Steps can also be built or edited by hand in the dashboard's test case designer.
+- Typed values (including passwords) are stored in the file as typed.
+- Running UI cases needs `TEST_EXECUTION_MODE=playwright`, `FRONTEND_URL`, and
+  Chromium on the machine that runs the tests. Serverless platforms such as
+  Vercel cannot host this part; it needs a long-lived worker or CI.
+
+## 5. Failure Model
 
 A failed test is not automatically a CATI bug.
 
@@ -120,7 +154,7 @@ Possible classifications:
 - Environment/service outage
 - Unknown
 
-## 5. Severity
+## 6. Severity
 
 Critical = core service or major business capability unusable.
 

@@ -137,7 +137,146 @@ async function executeApiCase(testCase) {
     return result;
 }
 
+function resolveLocator(page, loc = {}) {
+    const value = String(loc.value ?? '');
+    switch (loc.strategy) {
+        case 'testId': return page.getByTestId(value);
+        case 'label': return page.getByLabel(value).first();
+        case 'role': return page.getByRole(loc.role || 'button', { name: value }).first();
+        case 'text': return page.getByText(value).first();
+        default: return page.locator(value).first();
+    }
+}
+
+function describeStep(action) {
+    const loc = action.locator ? `${action.locator.strategy}=${action.locator.value}` : '';
+    return [action.kind, loc, action.value].filter(Boolean).join(' ');
+}
+
+async function runAction(page, action, base) {
+    const timeout = 10000;
+    switch (action.kind) {
+        case 'navigate':
+            await page.goto(joinUrl(base, action.value || '/'), { waitUntil: 'domcontentloaded', timeout: 30000 });
+            break;
+        case 'click':
+            await resolveLocator(page, action.locator).click({ timeout });
+            break;
+        case 'fill':
+            await resolveLocator(page, action.locator).fill(String(action.value ?? ''), { timeout });
+            break;
+        case 'select':
+            await resolveLocator(page, action.locator).selectOption({ label: String(action.value ?? '') }, { timeout });
+            break;
+        case 'press':
+            await resolveLocator(page, action.locator).press(action.value || 'Enter', { timeout });
+            break;
+        case 'wait':
+            if (action.waitFor === 'networkidle') {
+                await page.waitForLoadState('networkidle', { timeout: action.timeout || 10000 });
+            } else {
+                await resolveLocator(page, action.locator).waitFor({
+                    state: action.waitFor === 'hidden' ? 'hidden' : 'visible',
+                    timeout: action.timeout || 10000
+                });
+            }
+            break;
+        default:
+            throw new Error(`Unsupported step type "${action.kind}"`);
+    }
+}
+
+async function runAssertion(page, assertion) {
+    const expected = String(assertion.expected ?? '');
+    switch (assertion.kind) {
+        case 'visibleText':
+            await page.getByText(expected).first().waitFor({ state: 'visible', timeout: 10000 });
+            return;
+        case 'visible': {
+            const sel = /^[#.\[]/.test(expected) ? page.locator(expected).first() : page.getByText(expected).first();
+            await sel.waitFor({ state: 'visible', timeout: 10000 });
+            return;
+        }
+        case 'url':
+            await page.waitForURL((u) => u.toString().includes(expected), { timeout: 10000 });
+            return;
+        default:
+            throw new Error(`Assertion "${assertion.kind}" is not supported for browser tests`);
+    }
+}
+
+/**
+ * Runs a UI case authored with the designer / recorder:
+ * definition.actions are replayed in order, then definition.assertions.
+ */
+async function executeUiDefinitionCase(testCase, runId) {
+    const result = baseResult(testCase);
+    const input = parseMaybeJson(testCase.input) || {};
+    const { actions = [], assertions = [] } = testCase.definition;
+    const base = process.env.FRONTEND_URL;
+    const start = input.url || input.path || '/';
+
+    const needsBase = !/^https?:\/\//i.test(start) || actions.some((a) => a.kind === 'navigate' && !/^https?:\/\//i.test(a.value || ''));
+    if (needsBase && !base) {
+        result.error = 'FRONTEND_URL is not set in .env (needed for relative pages)';
+        return result;
+    }
+
+    result.page = joinUrl(base, start);
+    result.expected = assertions.map((a) => `${a.kind}: ${a.expected}`).join('; ') || `${actions.length} steps complete`;
+
+    const started = Date.now();
+    let browser;
+    let page;
+    let current = 'open start page';
+    try {
+        browser = await chromium.launch();
+        const context = await browser.newContext(existsSync(AUTH_STATE) ? { storageState: AUTH_STATE } : {});
+        page = await context.newPage();
+
+        // Recorded flows begin with a navigate step; otherwise open the start page.
+        if (actions[0]?.kind !== 'navigate') {
+            await page.goto(result.page, { waitUntil: 'domcontentloaded', timeout: 30000 });
+        }
+        for (const [index, action] of actions.entries()) {
+            current = `step ${index + 1} (${describeStep(action)})`;
+            await runAction(page, action, base);
+        }
+        for (const assertion of assertions) {
+            current = `check "${assertion.kind}: ${assertion.expected}"`;
+            await runAssertion(page, assertion);
+        }
+        result.status = 'PASS';
+        result.actual = result.expected;
+    } catch (err) {
+        const hint = /Executable doesn't exist/i.test(err.message)
+            ? ' - Chromium is not installed; run "npx playwright install" once.'
+            : '';
+        result.status = 'FAIL';
+        result.error = `Failed at ${current}: ${err.message.split('\n')[0]}${hint}`;
+        result.actual = `failed at ${current}`;
+        if (page) {
+            try {
+                const dir = path.join(REPO_ROOT, 'artifacts', 'generated', runId);
+                await mkdir(dir, { recursive: true });
+                const shot = path.join(dir, `${String(testCase.testCaseId)}.png`);
+                await page.screenshot({ path: shot, fullPage: true });
+                result.evidence = { screenshot: path.relative(REPO_ROOT, shot) };
+            } catch {
+                /* screenshot is best-effort */
+            }
+        }
+    } finally {
+        result.duration = Date.now() - started;
+        await browser?.close();
+    }
+    return result;
+}
+
 async function executeUiCase(testCase, runId) {
+    if (Array.isArray(testCase.definition?.actions) && testCase.definition.actions.length > 0) {
+        return executeUiDefinitionCase(testCase, runId);
+    }
     const result = baseResult(testCase);
     const input = parseMaybeJson(testCase.input) || {};
     const base = process.env.FRONTEND_URL;

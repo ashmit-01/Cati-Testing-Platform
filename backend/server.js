@@ -12,7 +12,7 @@ async function start() {
 
     const app = createApp();
 
-    app.listen(PORT, () => {
+    app.listen(PORT, '0.0.0.0', () => {
         logger.info(`CATI QA Backend listening on port ${PORT}`, {
             nodeEnv: process.env.NODE_ENV || 'development',
             executionMode: process.env.TEST_EXECUTION_MODE || 'mock'

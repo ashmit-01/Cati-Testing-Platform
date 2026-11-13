@@ -14,6 +14,7 @@ import EnvironmentBadge from './EnvironmentBadge.jsx'
 
 const NAV_ITEMS = [
   { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { to: '/test-cases', label: 'Test Cases', icon: ListChecks },
   { to: '/runs', label: 'Test Runs', icon: ListChecks },
   { to: '/failures', label: 'Failures', icon: AlertTriangle },
   { to: '/reports', label: 'Reports', icon: FileBarChart },

@@ -19,7 +19,7 @@ import axios from 'axios'
 export const api = axios.create({
   baseURL:
     import.meta.env.VITE_API_BASE_URL ||
-    'http://localhost:5001',
+    `http://${window.location.hostname}:5001`,
 
   timeout: 15000,
 
@@ -242,6 +242,51 @@ export async function getDashboard() {
       error,
       'Unable to load dashboard data. Please check the QA backend connection.'
     )
+  }
+
+}
+
+export async function getTestCases(params = {}) {
+  try {
+    const { data } = await api.get('/api/test-cases', { params })
+    return data?.testCases || []
+  } catch (error) {
+    throw toFriendlyError(error, 'Failed to load test cases.')
+  }
+}
+
+export async function createTestCase(testCase) {
+  try {
+    const { data } = await api.post('/api/test-cases', testCase)
+    return data?.testCase || data
+  } catch (error) {
+    throw toFriendlyError(error, 'Failed to create test case.')
+  }
+}
+
+export async function updateTestCase(id, testCase) {
+  try {
+    const { data } = await api.put(`/api/test-cases/${encodeURIComponent(id)}`, testCase)
+    return data?.testCase || data
+  } catch (error) {
+    throw toFriendlyError(error, 'Failed to update test case.')
+  }
+}
+
+export async function deleteTestCase(id) {
+  try {
+    await api.delete(`/api/test-cases/${encodeURIComponent(id)}`)
+  } catch (error) {
+    throw toFriendlyError(error, 'Failed to delete test case.')
+  }
+}
+
+export async function getTestSuites(params = {}) {
+  try {
+    const { data } = await api.get('/api/test-suites', { params })
+    return data?.suites || []
+  } catch (error) {
+    throw toFriendlyError(error, 'Failed to load test suites.')
   }
 }
 
