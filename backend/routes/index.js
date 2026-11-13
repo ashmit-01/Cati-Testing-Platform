@@ -12,6 +12,7 @@ import {
   ingestCiReport,
   reportCiProgress,
   reportCiFailure,
+  registerCiRun,
 } from "../controllers/testRunController.js";
 import testCaseRoutes from './testCaseRoutes.js';
 import testSuiteRoutes from './testSuiteRoutes.js';
@@ -53,6 +54,13 @@ router.post('/ci/trigger', authenticate, triggerGitHubWorkflow);
 
 // GitHub Actions CI report ingestion
 router.post('/test-runs/ci', authenticateCi, ingestCiReport);
+
+// Register GitHub Actions run ID as soon as the workflow starts
+router.post(
+  '/test-runs/:runId/register-ci',
+  authenticateCi,
+  registerCiRun
+);
 // Live progress updates from GitHub Actions
 router.post(
     '/test-runs/:runId/progress',

@@ -10,6 +10,7 @@ import { queueFailureAnalysis } from "../services/aiFailureAnalysisService.js";
 import { logger } from "../utils/logger.js";
 import { adaptCiReport } from "../services/ciResultAdapter.js";
 import { updateTestRunProgress } from "../services/testRunProgressService.js";
+import { cancelGitHubWorkflow } from "../services/githubActionsService.js";
 import {
   buildTestRunLog,
   getTestLogExpiresAt,
@@ -541,3 +542,138 @@ export const ingestCiReport = asyncHandler(async (req, res) => {
     throw error;
   }
 });
+
+export const cancelTestRun = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+
+  // Atomically reserve cancellation for an active GitHub Actions run.
+  const run = await TestRun.findOneAndUpdate(
+    {
+      runId: id,
+      status: TEST_RUN_STATUS.RUNNING,
+      "ci.provider": "github-actions",
+      "ci.runId": { $type: "string", $ne: "" },
+    },
+    {
+      $set: {
+        status: TEST_RUN_STATUS.CANCELLING,
+        cancellationRequestedAt: new Date(),
+      },
+    },
+    { new: true }
+  );
+
+  if (!run) {
+    const existing = await TestRun.findOne({ runId: id }).lean();
+
+    if (!existing) {
+      throw new ApiError(404, "Test run not found.");
+    }
+
+    if (existing.status === TEST_RUN_STATUS.CANCELLING) {
+      return res.status(202).json({
+        success: true,
+        message: "Cancellation is already in progress.",
+        status: existing.status,
+      });
+    }
+
+    if (existing.status !== TEST_RUN_STATUS.RUNNING) {
+      throw new ApiError(409, "This test run is no longer running.");
+    }
+
+    if (!existing.ci?.runId) {
+      throw new ApiError(
+        409,
+        "GitHub Actions run ID is not registered yet. Try again shortly."
+      );
+    }
+
+    throw new ApiError(409, "This run cannot be cancelled.");
+  }
+
+  try {
+    await cancelGitHubWorkflow(run.ci.runId);
+
+    return res.status(202).json({
+      success: true,
+      message: "GitHub cancellation requested successfully.",
+      runId: run.runId,
+      status: TEST_RUN_STATUS.CANCELLING,
+    });
+  } catch (error) {
+    await TestRun.findOneAndUpdate(
+      {
+        runId: id,
+        status: TEST_RUN_STATUS.CANCELLING,
+      },
+      {
+        $set: { status: TEST_RUN_STATUS.RUNNING },
+        $unset: { cancellationRequestedAt: 1 },
+      }
+    );
+
+    throw new ApiError(502, error.message);
+  }
+});
+export const registerCiRun = asyncHandler(async (req, res) => {
+  const { runId } = req.params;
+  const {
+    githubRunId,
+    runNumber,
+    runUrl,
+    workflow,
+    branch,
+    commit,
+  } = req.body || {};
+
+  if (!githubRunId) {
+    throw new ApiError(400, "GitHub Actions run ID is required.");
+  }
+
+  const run = await TestRun.findOneAndUpdate(
+    {
+      runId,
+      status: {
+        $in: [
+          TEST_RUN_STATUS.RUNNING,
+          TEST_RUN_STATUS.CANCELLING,
+        ],
+      },
+      "ci.provider": "github-actions",
+      $or: [
+        { "ci.runId": null },
+        { "ci.runId": { $exists: false } },
+        { "ci.runId": String(githubRunId) },
+      ],
+    },
+    {
+      $set: {
+        "ci.provider": "github-actions",
+        "ci.runId": String(githubRunId),
+        "ci.runNumber": runNumber != null ? String(runNumber) : null,
+        "ci.runUrl": runUrl || null,
+        "ci.workflow": workflow || null,
+        "ci.branch": branch || null,
+        "ci.commit": commit || null,
+      },
+    },
+    { new: true }
+  );
+
+  if (!run) {
+    throw new ApiError(
+      409,
+      "Run not found, already completed, or associated with another GitHub workflow."
+    );
+  }
+
+  return res.status(200).json({
+    success: true,
+    message: "GitHub Actions run registered.",
+    runId: run.runId,
+    githubRunId: run.ci.runId,
+    status: run.status,
+  });
+});
+

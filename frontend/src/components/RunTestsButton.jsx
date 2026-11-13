@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import {
@@ -6,6 +7,7 @@ import {
   GitBranch,
   ExternalLink,
   ChevronDown,
+  Square,
 } from "lucide-react";
 import { api } from "../services/api.js";
 
@@ -26,7 +28,9 @@ export default function RunTestsButton({ className = "", onRunStarted }) {
   const [testSuite, setTestSuite] = useState("all");
 
   async function handleRunTests() {
-    if (status === "starting") return;
+    if (status === "starting" || status === "running" || status === "cancelling") {
+      return;
+    }
 
     setStatus("starting");
     setMessage("");
@@ -38,7 +42,6 @@ export default function RunTestsButton({ className = "", onRunStarted }) {
         testSuite,
       });
 
-      setStatus("success");
       setMessage(
         data.message || "GitHub Actions workflow triggered successfully.",
       );
@@ -49,7 +52,10 @@ export default function RunTestsButton({ className = "", onRunStarted }) {
 
       if (data.runId) {
         setRunId(data.runId);
+        setStatus("running");
         onRunStarted?.(data.runId);
+      } else {
+        setStatus("success");
       }
     } catch (error) {
       console.error("GitHub Actions trigger failed:", error);
@@ -63,6 +69,42 @@ export default function RunTestsButton({ className = "", onRunStarted }) {
     }
   }
 
+  async function handleStopTests() {
+    if (!runId || status !== "running") return;
+
+    const confirmed = window.confirm(
+      "Are you sure you want to stop this GitHub Actions test run?",
+    );
+
+    if (!confirmed) return;
+
+    setStatus("cancelling");
+    setMessage("Requesting cancellation from GitHub Actions...");
+
+    try {
+      const { data } = await api.post(
+        `/api/test-runs/${encodeURIComponent(runId)}/cancel`,
+      );
+
+      setStatus("cancelling");
+      setMessage(
+        data.message ||
+          "Cancellation requested. Waiting for GitHub Actions to stop the run.",
+      );
+    } catch (error) {
+      console.error("Test cancellation failed:", error);
+
+      setStatus("running");
+      setMessage(
+        error.response?.data?.message ||
+          error.message ||
+          "Unable to cancel the test run.",
+      );
+    }
+  }
+
+  const isBusy = ["starting", "running", "cancelling"].includes(status);
+
   return (
     <div className={className}>
       <div className="flex flex-wrap items-center gap-3">
@@ -71,7 +113,7 @@ export default function RunTestsButton({ className = "", onRunStarted }) {
           <select
             value={testSuite}
             onChange={(e) => setTestSuite(e.target.value)}
-            disabled={status === "starting"}
+            disabled={isBusy}
             className="appearance-none rounded-md border border-border bg-card px-4 py-2.5 pr-10 text-sm font-medium text-foreground outline-none focus:border-info disabled:opacity-60"
           >
             {TEST_SUITES.map((suite) => (
@@ -88,7 +130,7 @@ export default function RunTestsButton({ className = "", onRunStarted }) {
         <button
           type="button"
           onClick={handleRunTests}
-          disabled={status === "starting"}
+          disabled={isBusy}
           className="inline-flex items-center gap-2 rounded-md bg-info px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-info/90 disabled:cursor-not-allowed disabled:opacity-60"
         >
           {status === "starting" ? (
@@ -104,6 +146,30 @@ export default function RunTestsButton({ className = "", onRunStarted }) {
             </>
           )}
         </button>
+
+        {/* Stop Tests Button */}
+        {status === "running" && runId && (
+          <button
+            type="button"
+            onClick={handleStopTests}
+            className="inline-flex items-center gap-2 rounded-md bg-failure px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-failure/90"
+          >
+            <Square className="h-4 w-4" />
+            Stop Run
+          </button>
+        )}
+
+        {/* Cancelling State */}
+        {status === "cancelling" && (
+          <button
+            type="button"
+            disabled
+            className="inline-flex items-center gap-2 rounded-md border border-warning/30 bg-warning/10 px-5 py-2.5 text-sm font-semibold text-warning"
+          >
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Cancelling...
+          </button>
+        )}
       </div>
 
       {/* Execution Status */}
@@ -112,7 +178,9 @@ export default function RunTestsButton({ className = "", onRunStarted }) {
           className={`mt-3 rounded-md border px-3 py-2 text-sm ${
             status === "error"
               ? "border-failure/30 bg-failure/10 text-failure"
-              : "border-success/30 bg-success/10 text-success"
+              : status === "cancelling"
+                ? "border-warning/30 bg-warning/10 text-warning"
+                : "border-success/30 bg-success/10 text-success"
           }`}
         >
           {message}

@@ -5,6 +5,8 @@ const { Schema } = mongoose;
 export const TEST_RUN_STATUS = Object.freeze({
   RUNNING: "RUNNING",
   COMPLETED: "COMPLETED",
+  CANCELLING: "CANCELLING",
+  CANCELLED: "CANCELLED",
   FAILED: "FAILED",
 });
 
@@ -56,6 +58,14 @@ const testRunSchema = new Schema(
       default: null,
     },
     completedAt: {
+      type: Date,
+      default: null,
+    },
+    cancellationRequestedAt: {
+      type: Date,
+      default: null,
+   },
+    cancelledAt: {
       type: Date,
       default: null,
     },

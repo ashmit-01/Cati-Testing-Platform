@@ -5,6 +5,7 @@ import {
   listTestRuns,
   getTestRunById,
   downloadTestRunLog,
+  cancelTestRun,
 } from "../controllers/testRunController.js";
 
 import { validateCreateTestRun } from "../middleware/validateRequest.js";
@@ -17,6 +18,8 @@ router.get("/", listTestRuns);
 
 // Download a test execution log
 router.get("/:id/log", downloadTestRunLog);
+
+router.post("/:id/cancel", cancelTestRun);
 
 router.get("/:id", getTestRunById);
 

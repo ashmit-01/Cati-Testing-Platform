@@ -24,13 +24,15 @@ on:
           - e2e
           - websocket
           - ai-voice
+
       platform_run_id:
-        description: "CATI QA dashboard run ID (set automatically when started from the dashboard)"
+        description: "CATI QA dashboard run ID"
         required: false
         type: string
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
   group: cati-qa-${{ github.workflow }}-${{ github.ref }}
@@ -55,15 +57,24 @@ jobs:
       TEST_PASSWORD: ${{ secrets.TEST_PASSWORD }}
 
     steps:
+      # --------------------------------------------------
+      # 1. Checkout
+      # --------------------------------------------------
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # --------------------------------------------------
+      # 2. Setup Node.js
+      # --------------------------------------------------
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
 
+      # --------------------------------------------------
+      # 3. Validate required secrets
+      # --------------------------------------------------
       - name: Validate required secrets
         shell: bash
         run: |
@@ -74,16 +85,75 @@ jobs:
             fi
           done
 
+          if [ -z "$CI_INGESTION_TOKEN" ]; then
+            echo "::error::Missing GitHub Secret: CI_INGESTION_TOKEN"
+            exit 1
+          fi
+        env:
+          CI_INGESTION_TOKEN: ${{ secrets.CI_INGESTION_TOKEN }}
+
+      # --------------------------------------------------
+      # 4. Register GitHub Actions run with CATI backend
+      # --------------------------------------------------
+      - name: Register GitHub Actions run
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.platform_run_id != '' }}
+        env:
+          BACKEND_URL: ${{ secrets.BACKEND_URL }}
+          CI_INGESTION_TOKEN: ${{ secrets.CI_INGESTION_TOKEN }}
+          PLATFORM_RUN_ID: ${{ inputs.platform_run_id }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+          GITHUB_RUN_NUMBER: ${{ github.run_number }}
+          GITHUB_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          GITHUB_WORKFLOW: ${{ github.workflow }}
+          GITHUB_BRANCH: ${{ github.ref_name }}
+          GITHUB_COMMIT: ${{ github.sha }}
+        shell: bash
+        run: |
+          BASE_URL="${BACKEND_URL%/}"
+
+          echo "Registering GitHub Actions run with CATI QA backend..."
+
+          curl --fail-with-body --silent --show-error \
+            --request POST \
+            --url "${BASE_URL}/api/test-runs/${PLATFORM_RUN_ID}/register-ci" \
+            --header "Authorization: Bearer ${CI_INGESTION_TOKEN}" \
+            --header "Content-Type: application/json" \
+            --data "$(node -e '
+              console.log(JSON.stringify({
+                githubRunId: process.env.GITHUB_RUN_ID,
+                runNumber: process.env.GITHUB_RUN_NUMBER,
+                runUrl: process.env.GITHUB_RUN_URL,
+                workflow: process.env.GITHUB_WORKFLOW,
+                branch: process.env.GITHUB_BRANCH,
+                commit: process.env.GITHUB_COMMIT
+              }))
+            ')"
+
+          echo "GitHub Actions run registered successfully."
+
+      # --------------------------------------------------
+      # 5. Install npm dependencies
+      # --------------------------------------------------
       - name: Install dependencies
         run: npm ci
 
+      # --------------------------------------------------
+      # 6. Install Playwright
+      # --------------------------------------------------
       - name: Install Chromium and system dependencies
         run: npx playwright install --with-deps chromium
 
+      # --------------------------------------------------
+      # 7. Display selected suite
+      # --------------------------------------------------
       - name: Display selected test suite
         run: |
           echo "Selected test suite: $TEST_SUITE"
+          echo "Platform run ID: ${{ inputs.platform_run_id }}"
 
+      # --------------------------------------------------
+      # 8. Execute QA tests
+      # --------------------------------------------------
       - name: Run QA tests
         run: npm run test:qa-report
         env:
@@ -92,6 +162,9 @@ jobs:
           QA_PROGRESS_INGEST_URL: ${{ secrets.QA_INGEST_URL }}
           CI_INGESTION_TOKEN: ${{ secrets.CI_INGESTION_TOKEN }}
 
+      # --------------------------------------------------
+      # 9. Send final QA report to backend
+      # --------------------------------------------------
       - name: Send QA report to staging backend
         if: always()
         env:
@@ -113,6 +186,7 @@ jobs:
             INGEST_URL_NO_TRAILING_SLASH="${QA_INGEST_URL%/}"
             BASE_URL="${INGEST_URL_NO_TRAILING_SLASH%/api/test-runs/ci}"
             FAILURE_URL="${BASE_URL}/api/test-runs/${PLATFORM_RUN_ID}/failure"
+
             MESSAGE_JSON=$(node -e 'process.stdout.write(JSON.stringify({ message: process.argv[1] }))' "$MESSAGE")
 
             curl --silent --show-error \
@@ -142,12 +216,16 @@ jobs:
             --header "Authorization: Bearer $CI_INGESTION_TOKEN" \
             --header "Content-Type: application/json" \
             --data-binary "@$REPORT"; then
+
             notify_dashboard_failure "The generated QA report could not be ingested by the CATI QA backend."
             exit 1
           fi
 
           echo "QA report sent successfully."
 
+      # --------------------------------------------------
+      # 10. Upload Playwright report
+      # --------------------------------------------------
       - name: Upload Playwright report
         if: always()
         uses: actions/upload-artifact@v4
@@ -157,6 +235,9 @@ jobs:
           if-no-files-found: warn
           retention-days: 30
 
+      # --------------------------------------------------
+      # 11. Upload QA report
+      # --------------------------------------------------
       - name: Upload QA report
         if: always()
         uses: actions/upload-artifact@v4
@@ -166,6 +247,9 @@ jobs:
           if-no-files-found: warn
           retention-days: 30
 
+      # --------------------------------------------------
+      # 12. Upload test evidence
+      # --------------------------------------------------
       - name: Upload test evidence
         if: always()
         uses: actions/upload-artifact@v4
