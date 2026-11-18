@@ -264,12 +264,52 @@ export async function createTestCase(testCase) {
   }
 }
 
+export async function getAuthOptions() {
+  try {
+    const { data } = await api.get('/api/test-cases/auth-options')
+    return data?.options || []
+  } catch (error) {
+    throw toFriendlyError(error, 'Failed to load authentication options.')
+  }
+}
+
+export async function importEndpoints(endpointExport, params = {}) {
+  try {
+    const { data } = await api.post('/api/test-cases/import-endpoints', endpointExport, { params })
+    return data
+  } catch (error) {
+    throw toFriendlyError(error, 'Failed to import endpoints.')
+  }
+}
+
+/**
+ * Imports an OpenAPI 3.x document (object, or JSON/YAML text).
+ * params: { dryRun?: boolean, bundleName?: string, fileName?: string }
+ */
+export async function importOpenApi(spec, params = {}) {
+  try {
+    const { data } = await api.post('/api/test-cases/import-openapi', { spec }, { params })
+    return data
+  } catch (error) {
+    throw toFriendlyError(error, 'Failed to import the OpenAPI spec.')
+  }
+}
+
 export async function updateTestCase(id, testCase) {
   try {
     const { data } = await api.put(`/api/test-cases/${encodeURIComponent(id)}`, testCase)
     return data?.testCase || data
   } catch (error) {
     throw toFriendlyError(error, 'Failed to update test case.')
+  }
+}
+
+export async function deleteTestCases(testCaseIds) {
+  try {
+    const { data } = await api.post('/api/test-cases/bulk-delete', { testCaseIds })
+    return data
+  } catch (error) {
+    throw toFriendlyError(error, 'Failed to delete test cases.')
   }
 }
 
@@ -287,6 +327,43 @@ export async function getTestSuites(params = {}) {
     return data?.suites || []
   } catch (error) {
     throw toFriendlyError(error, 'Failed to load test suites.')
+  }
+}
+
+export async function updateTestSuite(id, fields) {
+  try {
+    const { data } = await api.put(`/api/test-suites/${encodeURIComponent(id)}`, fields)
+    return data?.suite
+  } catch (error) {
+    throw toFriendlyError(error, 'Failed to update the bundle.')
+  }
+}
+
+/** deleteCases: also delete the bundle's test cases (default keeps them, unassigned). */
+export async function deleteTestSuite(id, { deleteCases = false } = {}) {
+  try {
+    await api.delete(`/api/test-suites/${encodeURIComponent(id)}`, { params: deleteCases ? { deleteCases: true } : {} })
+  } catch (error) {
+    throw toFriendlyError(error, 'Failed to delete the bundle.')
+  }
+}
+
+/** Moves cases into a suite, or detaches them from it when remove is true. */
+export async function assignCasesToSuite(suiteId, testCaseIds, { remove = false } = {}) {
+  try {
+    const { data } = await api.post(`/api/test-suites/${encodeURIComponent(suiteId)}/assign`, { testCaseIds, remove })
+    return data
+  } catch (error) {
+    throw toFriendlyError(error, 'Failed to move test cases.')
+  }
+}
+
+export async function setSuiteActive(suiteId, active) {
+  try {
+    const { data } = await api.post(`/api/test-suites/${encodeURIComponent(suiteId)}/active`, { active })
+    return data
+  } catch (error) {
+    throw toFriendlyError(error, 'Failed to switch the bundle on or off.')
   }
 }
 

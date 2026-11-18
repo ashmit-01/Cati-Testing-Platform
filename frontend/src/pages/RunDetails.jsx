@@ -397,6 +397,16 @@ export default function RunDetails() {
             </p>
           </div>
 
+          {run.targetUrl && (
+            <div>
+              <p className="text-xs text-secondary">Target URL</p>
+
+              <p className="mt-1 break-all text-sm font-medium text-primary">
+                {run.targetUrl}
+              </p>
+            </div>
+          )}
+
           <div>
             <p className="text-xs text-secondary">Execution Mode</p>
 

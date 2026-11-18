@@ -1464,7 +1464,8 @@ async function runStoredTestCases({
     runId,
     environment,
     suiteId,
-    testCaseIds
+    testCaseIds,
+    targetUrl
 }) {
     const startedAt =
         Date.now();
@@ -1512,7 +1513,12 @@ async function runStoredTestCases({
             const real =
                 await executeTestCaseWithPlaywright(
                     testCase,
-                    runId
+                    runId,
+                    {
+                        apiBaseUrl:
+                            targetUrl ||
+                            null
+                    }
                 );
 
             results.push(
@@ -1582,7 +1588,8 @@ export async function runTests({
     environment,
     suites,
     suiteId,
-    testCaseIds
+    testCaseIds,
+    targetUrl
 }) {
     const mode =
         (
@@ -1646,7 +1653,8 @@ export async function runTests({
                     runId,
                     environment,
                     suiteId,
-                    testCaseIds
+                    testCaseIds,
+                    targetUrl
                 }
             );
     }

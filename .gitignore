@@ -13,3 +13,4 @@ coverage/
 *.log
 playwright/.auth/
 reports/playwright-results.json.env
+graphify-out/

@@ -9,6 +9,7 @@ import { processFailures } from "../services/failureService.js";
 import { queueFailureAnalysis } from "../services/aiFailureAnalysisService.js";
 import { logger } from "../utils/logger.js";
 import { adaptCiReport } from "../services/ciResultAdapter.js";
+import { normalizeTargetUrl } from "../services/targetUrl.js";
 import { updateTestRunProgress } from "../services/testRunProgressService.js";
 import {
   cancelGitHubWorkflow,
@@ -27,7 +28,7 @@ import {
 async function executeInBackground(
   runId,
   environment,
-  { suites, suiteId, testCaseIds },
+  { suites, suiteId, testCaseIds, targetUrl },
 ) {
   try {
     const outcome = await runTests({
@@ -36,6 +37,7 @@ async function executeInBackground(
       suites,
       suiteId,
       testCaseIds,
+      targetUrl,
     });
 
     const { savedResults } = await processResults(
@@ -109,6 +111,13 @@ async function executeInBackground(
 export const createTestRun = asyncHandler(async (req, res) => {
   const { environment, suites, suiteId, testCaseIds } = req.body;
 
+  let targetUrl;
+  try {
+    targetUrl = normalizeTargetUrl(req.body.targetUrl);
+  } catch (error) {
+    throw new ApiError(400, error.message);
+  }
+
   const runId = await generateRunId();
 
   const testRun = await TestRun.create({
@@ -117,6 +126,7 @@ export const createTestRun = asyncHandler(async (req, res) => {
     suites: suites ? suites.map((suite) => suite.toUpperCase()) : [],
     suiteId: suiteId || null,
     testCaseIds: testCaseIds || [],
+    targetUrl,
     status: TEST_RUN_STATUS.RUNNING,
     startedAt: new Date(),
   });
@@ -127,6 +137,7 @@ export const createTestRun = asyncHandler(async (req, res) => {
     suites: testRun.suites,
     suiteId: testRun.suiteId,
     testCaseIds: testRun.testCaseIds,
+    targetUrl: testRun.targetUrl,
   }).catch((err) => {
     logger.error("Unexpected error launching background test execution", {
       runId,
@@ -140,6 +151,7 @@ export const createTestRun = asyncHandler(async (req, res) => {
     suites: testRun.suites,
     suiteId,
     testCaseIds,
+    targetUrl,
   });
 
   res.status(202).json({

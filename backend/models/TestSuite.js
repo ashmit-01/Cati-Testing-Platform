@@ -33,6 +33,13 @@ const testSuiteSchema = new Schema(
         description: {
             type: String,
             default: ''
+        },
+        source: {
+            // Set when the suite is a bundle created by an import, e.g.
+            // { kind: 'openapi', specTitle, specVersion, fileName, importedAt }.
+            // Null for suites created by hand.
+            type: Schema.Types.Mixed,
+            default: null
         }
     },
     { timestamps: true }
