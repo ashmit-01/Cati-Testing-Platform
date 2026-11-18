@@ -5,7 +5,9 @@ const ASSERTION_TYPES = [
   { value: 'visible', label: 'Element is visible', placeholder: 'Element locator' },
   { value: 'url', label: 'URL contains', placeholder: '/dashboard' },
   { value: 'status', label: 'Response status is', placeholder: '200' },
-  { value: 'jsonPath', label: 'Response field equals', placeholder: '$.data.id' }
+  { value: 'statusBelow', label: 'Response status is below', placeholder: '500' },
+  { value: 'jsonPath', label: 'Response field equals', placeholder: '$.data.id' },
+  { value: 'schema', label: 'Response matches OpenAPI schema', placeholder: '' }
 ]
 
 export default function AssertionBuilder({ assertions = [], onChange, compact = false }) {
@@ -35,7 +37,7 @@ export default function AssertionBuilder({ assertions = [], onChange, compact = 
           return (
             <div key={index} className="grid gap-3 rounded-xl border border-border bg-bg p-4 sm:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_auto]">
               <label className="field-label"><span className="sr-only">Assertion {index + 1} type</span><select className="field" value={assertion.kind || 'visibleText'} onChange={(e) => update(index, 'kind', e.target.value)}>{ASSERTION_TYPES.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
-              <label className="field-label"><span className="sr-only">Assertion {index + 1} expected value</span><input required className="field" placeholder={type.placeholder} value={assertion.expected ?? assertion.path ?? ''} onChange={(e) => update(index, assertion.kind === 'jsonPath' ? 'path' : 'expected', e.target.value)} /></label>
+              {assertion.kind === 'schema' ? <p className="self-center text-xs text-secondary">Checks the body against the response schema imported from OpenAPI.</p> : <label className="field-label"><span className="sr-only">Assertion {index + 1} expected value</span><input required className="field" placeholder={type.placeholder} value={assertion.expected ?? assertion.path ?? ''} onChange={(e) => update(index, assertion.kind === 'jsonPath' ? 'path' : 'expected', e.target.value)} /></label>}
               <button type="button" className="icon-button self-end" aria-label={`Remove assertion ${index + 1}`} onClick={() => onChange(assertions.filter((_, current) => current !== index))}><Trash2 className="h-4 w-4" /></button>
             </div>
           )

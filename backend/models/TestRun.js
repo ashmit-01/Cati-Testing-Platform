@@ -43,6 +43,13 @@ const testRunSchema = new Schema(
       ref: "TestCase",
       default: [],
     },
+    targetUrl: {
+      // Base URL the run's API cases were sent to (branch deployment,
+      // staging, local backend). Null means the platform default
+      // (CATI_API_URL / BACKEND_URL).
+      type: String,
+      default: null,
+    },
     status: {
       type: String,
       enum: Object.values(TEST_RUN_STATUS),
