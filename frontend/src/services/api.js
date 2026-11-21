@@ -173,6 +173,14 @@ export async function getTestRuns() {
  *
  * not MongoDB _id.
  */
+export async function cancelTestRun(id) {
+  try {
+    await api.post(`/api/test-runs/${encodeURIComponent(id)}/cancel`)
+  } catch (error) {
+    throw toFriendlyError(error, 'Could not cancel this run.')
+  }
+}
+
 export async function getTestRun(id) {
   if (!id || id === 'undefined') {
     throw new Error(

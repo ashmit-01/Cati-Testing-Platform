@@ -13,6 +13,7 @@ import {
 
 import { logger } from '../utils/logger.js';
 import TestCase from '../models/TestCase.js';
+import { updateTestRunProgress } from './testRunProgressService.js';
 import { checkResult } from './resultCheckerService.js';
 import {
     executeTestCaseWithPlaywright
@@ -1497,7 +1498,34 @@ async function runStoredTestCases({
 
     const results = [];
 
+    const progress = {
+        totalTests: testCases.length,
+        completedTests: 0,
+        passed: 0,
+        failed: 0,
+        skipped: 0,
+        completedDurationMs: 0
+    };
+
+    async function publishProgress(result) {
+        if (result) {
+            progress.completedTests++;
+            if (result.status === 'PASS') progress.passed++;
+            else if (result.status === 'FAIL') progress.failed++;
+            else progress.skipped++;
+            progress.completedDurationMs += Number(result.duration) || 0;
+        }
+        try {
+            const update = await updateTestRunProgress(runId, progress);
+            return update?.ignored;
+        } catch (error) {
+            logger.warn('Could not save live test progress', { runId, message: error.message });
+        }
+    }
+
+    let stopRequested = await publishProgress();
     for (const testCase of testCases) {
+        if (stopRequested) break;
         if (mode === 'mock') {
             results.push(
                 runTestCaseMock(
@@ -1506,6 +1534,7 @@ async function runStoredTestCases({
                 )
             );
 
+            stopRequested = await publishProgress(results.at(-1));
             continue;
         }
 
@@ -1570,6 +1599,7 @@ async function runStoredTestCases({
                 evidence: {}
             });
         }
+        stopRequested = await publishProgress(results.at(-1));
     }
 
     return buildSummary(

@@ -9,7 +9,7 @@ import StatusBadge from "../components/StatusBadge.jsx";
 import FailureTable from "../components/FailureTable.jsx";
 import DownloadRunLogButton from "../components/DownloadRunLogButton.jsx";
 
-import { getTestRun } from "../services/api.js";
+import { cancelTestRun, getTestRun } from "../services/api.js";
 
 const POLL_INTERVAL = 2000;
 
@@ -109,6 +109,8 @@ export default function RunDetails() {
   });
 
   const [refreshing, setRefreshing] = useState(false);
+  const [cancelPending, setCancelPending] = useState(false);
+  const [cancelError, setCancelError] = useState("");
 
   const load = useCallback(
     async (showLoading = true) => {
@@ -183,7 +185,7 @@ export default function RunDetails() {
 
     const status = String(state.run.status).toUpperCase();
 
-    if (status !== "RUNNING") {
+    if (status !== "RUNNING" && status !== "CANCELLING") {
       return undefined;
     }
 
@@ -257,6 +259,10 @@ export default function RunDetails() {
   const failures = extractFailures(run);
 
   const isRunning = String(run.status).toUpperCase() === "RUNNING";
+  const isTestCaseRun = Boolean(run.suiteId || run.testCaseIds?.length);
+  const isGitHubRun = run.ci?.provider === "github-actions";
+  const missingReport = isGitHubRun && run.status === "FAILED" && !run.reportImportedAt && !totalTests;
+  const awaitingGitHubId = isGitHubRun && !run.ci.runId;
 
   return (
     <div className="space-y-6">
@@ -315,6 +321,29 @@ export default function RunDetails() {
 
         <div className="flex flex-wrap items-center gap-3">
           <StatusBadge status={run.status || "UNKNOWN"} />
+          {isRunning && (isTestCaseRun || isGitHubRun) && (
+            <button
+              type="button"
+              disabled={cancelPending || awaitingGitHubId}
+              title={awaitingGitHubId ? "Waiting for GitHub to register this workflow run" : isGitHubRun ? "Cancel this GitHub Actions workflow run" : "Stop after the current test case"}
+              className="rounded-md border border-danger/50 px-3 py-1.5 text-sm text-danger disabled:opacity-50"
+              onClick={async () => {
+                setCancelPending(true);
+                setCancelError("");
+                try {
+                  await cancelTestRun(id);
+                  await load(false);
+                } catch (error) {
+                  setCancelError(error.message);
+                } finally {
+                  setCancelPending(false);
+                }
+              }}
+            >
+              {cancelPending ? "Cancelling…" : "Cancel run"}
+            </button>
+          )}
+          {isRunning && cancelError && <span role="alert">{cancelError}</span>}
           <DownloadRunLogButton
             runId={run.runId || id}
             available={Boolean(run.logAvailable)}
@@ -328,7 +357,9 @@ export default function RunDetails() {
       {/* STATS */}
       {/* ====================================================== */}
 
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
+      {missingReport ? <p role="status" className="rounded-lg border border-border bg-card p-5 text-secondary">
+        The workflow failed before the dashboard received its test results. Test counts are unavailable.
+      </p> : <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
         <StatCard label="Total" value={totalTests} />
 
         <StatCard label="Passed" value={passed} accent="success" />
@@ -338,13 +369,13 @@ export default function RunDetails() {
         <StatCard label="Skipped" value={skipped} accent="warning" />
 
         <StatCard label="Pass Rate" value={passRate} suffix="%" accent="info" />
-      </div>
+      </div>}
 
       {/* ====================================================== */}
       {/* LIVE EXECUTION PROGRESS */}
       {/* ====================================================== */}
 
-      {isRunning && (
+      {isRunning && isTestCaseRun && (
         <section className="rounded-lg border border-info/30 bg-info/[0.04] p-5">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <h2 className="text-sm font-semibold text-primary">
@@ -442,7 +473,7 @@ export default function RunDetails() {
           <div>
             <h2 className="text-sm font-semibold text-primary">Failed Tests</h2>
 
-            {!isRunning && (
+            {!isRunning && !missingReport && (
               <p className="mt-1 text-xs text-secondary">
                 {failures.length} failure
                 {failures.length === 1 ? "" : "s"} returned
@@ -504,7 +535,7 @@ export default function RunDetails() {
           /* NO FAILURES */
 
           <div className="rounded-lg border border-border bg-card p-8 text-center">
-            <p className="text-sm text-secondary">No test failures found.</p>
+            <p className="text-sm text-secondary">{missingReport ? "Failure details are unavailable until the report is imported." : "No test failures found."}</p>
           </div>
         )}
       </section>

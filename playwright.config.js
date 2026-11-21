@@ -19,12 +19,6 @@ const reporters = [
   ],
 ];
 
-// The dashboard-triggered workflow supplies PLATFORM_RUN_ID. Local Playwright
-// runs and manually dispatched workflows without that input remain unchanged.
-if (process.env.PLATFORM_RUN_ID) {
-  reporters.push(["./reports/progressReporter.js"]);
-}
-
 export default defineConfig({
   testDir: "./test-engine",
 

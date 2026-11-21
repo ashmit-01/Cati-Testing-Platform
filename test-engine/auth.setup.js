@@ -145,6 +145,7 @@ setup('authenticate', async ({ page }) => {
 
     await page.context().storageState({
         path: authFile,
+        indexedDB: true,
     });
 
     console.log(

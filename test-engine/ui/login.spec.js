@@ -10,14 +10,15 @@ test("Login rejects invalid credentials", async ({ page }) => {
 
   await page
     .getByRole("textbox", { name: "you@example.com" })
-    .fill("invalid@mail.com");
-  await page.getByRole("textbox", { name: "Enter password" }).fill("Wrong");
+    .fill("invalid@example.test");
+  await page.getByRole("textbox", { name: "Enter password" }).fill("Incorrect-Password-42!");
 
   await page.getByRole("button", { name: "Sign in" }).click();
 
-  await expect(page.getByText(/invalid credential/i)).toBeVisible({
+  await expect(page.getByText(/invalid (?:login )?credentials|(?:invalid|incorrect) email or password/i)).toBeVisible({
     timeout: 10_000,
   });
+  await expect(page).toHaveURL(/\/auth\/login(?:[?#]|$)/);
 });
 
 test("User can login successfully", async ({ page }) => {

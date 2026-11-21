@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import TestResult from '../models/TestResult.js';
 import { logger } from '../utils/logger.js';
 
@@ -9,7 +10,7 @@ import { logger } from '../utils/logger.js';
  * result and a mock-mode result won't always carry the exact same set of
  * properties (e.g. `endpoint` only makes sense for API suite tests).
  */
-async function saveOne(runId, environment, rawResult) {
+async function saveOne(runId, environment, rawResult, reportIndex) {
     const doc = new TestResult({
         runId,
         testCaseId: rawResult.testCaseId || null,
@@ -27,6 +28,14 @@ async function saveOne(runId, environment, rawResult) {
         evidence: rawResult.evidence || {}
     });
 
+    if (reportIndex !== undefined) {
+        // A retried upload uses the same document for each row of the report.
+        const id = createHash('sha256').update(JSON.stringify([runId, reportIndex])).digest('hex').slice(0, 24);
+        await doc.validate();
+        const fields = doc.toObject();
+        delete fields._id;
+        return TestResult.findOneAndUpdate({ _id: id }, { $setOnInsert: fields }, { upsert: true, new: true });
+    }
     return doc.save();
 }
 
@@ -39,12 +48,12 @@ async function saveOne(runId, environment, rawResult) {
  * @param {string} [environment] - the run's environment, denormalized onto each result
  * @returns {Promise<{summary: Object, savedResults: Array}>}
  */
-export async function processResults(runId, rawResults, environment) {
+export async function processResults(runId, rawResults, environment, { ciImport = false } = {}) {
     const savedResults = [];
 
-    for (const rawResult of rawResults) {
+    for (const [index, rawResult] of rawResults.entries()) {
         try {
-            const saved = await saveOne(runId, environment, rawResult);
+            const saved = await saveOne(runId, environment, rawResult, ciImport ? index : undefined);
             savedResults.push(saved);
         } catch (err) {
             logger.error('Failed to persist a TestResult, skipping it', {

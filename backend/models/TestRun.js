@@ -68,6 +68,7 @@ const testRunSchema = new Schema(
       type: Date,
       default: null,
     },
+    reportImportedAt: Date,
     cancellationRequestedAt: {
       type: Date,
       default: null,

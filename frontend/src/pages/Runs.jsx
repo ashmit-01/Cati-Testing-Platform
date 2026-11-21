@@ -421,7 +421,7 @@ export default function Runs() {
                     {/* ================================== */}
 
                     <td className="px-4 py-3 text-secondary">
-                      {isRunning ? (
+                      {isRunning && (run.suiteId || run.testCaseIds?.length > 0) ? (
                         <div className="min-w-36 space-y-1.5">
                           <div className="flex items-center justify-between gap-2 text-xs">
                             <span>
@@ -453,7 +453,7 @@ export default function Runs() {
                           </p>
                         </div>
                       ) : (
-                        <span className="text-xs text-secondary">Finished</span>
+                        <span className="text-xs text-secondary">{isRunning ? "—" : "Finished"}</span>
                       )}
                     </td>
 

@@ -53,8 +53,8 @@ async function executeInBackground(
     // delay the run or erase a saved failure.
     queueFailureAnalysis(failures);
 
-    await TestRun.findOneAndUpdate(
-      { runId },
+    const completed = await TestRun.findOneAndUpdate(
+      { runId, status: TEST_RUN_STATUS.RUNNING },
       {
         status: TEST_RUN_STATUS.COMPLETED,
         completedAt: new Date(),
@@ -73,6 +73,23 @@ async function executeInBackground(
         ).toLowerCase(),
       },
     );
+
+    if (!completed) {
+      const now = new Date();
+      await TestRun.updateOne({ runId, status: TEST_RUN_STATUS.CANCELLING }, {
+        status: TEST_RUN_STATUS.CANCELLED,
+        completedAt: now,
+        cancelledAt: now,
+        completedTests: outcome.totalTests,
+        passed: outcome.passed,
+        failed: outcome.failed,
+        skipped: outcome.skipped,
+        duration: outcome.duration,
+        estimatedRemainingMs: null,
+        etaAt: null,
+      });
+      return;
+    }
 
     logger.info("Test run completed", {
       runId,
@@ -307,9 +324,14 @@ export const listTestRuns = asyncHandler(async (req, res) => {
 export const getTestRunById = asyncHandler(async (req, res) => {
   const { id } = req.params;
 
-  const run = await TestRun.findOne({ runId: id }).lean();
+  let run = await TestRun.findOne({ runId: id }).lean();
   if (!run) {
     throw new ApiError(404, `No test run found with runId "${id}"`);
+  }
+
+  if (run.status === TEST_RUN_STATUS.CANCELLING && run.ci?.provider === "github-actions" && run.ci.runId) {
+    await syncGitHubRunStatus(run);
+    run = await TestRun.findOne({ runId: id }).lean() || run;
   }
 
   const recentFailures = await Failure.find({ runId: id })
@@ -491,24 +513,15 @@ export const ingestCiReport = asyncHandler(async (req, res) => {
 
   const adapted = adaptCiReport(report);
 
-  const existingCiRun = await TestRun.findOne({ "ci.runId": String(ci.runId) })
-    .select("runId status")
-    .lean();
-
-  if (existingCiRun) {
-    throw new ApiError(
-      409,
-      `GitHub Actions run "${ci.runId}" has already been imported.`,
-    );
-  }
+  const existingCiRun = await TestRun.findOne({ "ci.runId": String(ci.runId) });
 
   // Runs triggered from the dashboard are created before dispatch so that
   // progress can be shown immediately. Manual workflow_dispatch runs do not
   // carry platformRunId and retain the legacy post-completion import flow.
   const platformRunId = ci.platformRunId ? String(ci.platformRunId) : null;
-  let testRun = platformRunId
+  let testRun = existingCiRun || (platformRunId
     ? await TestRun.findOne({ runId: platformRunId })
-    : null;
+    : null);
 
   if (platformRunId && !testRun) {
     throw new ApiError(
@@ -517,11 +530,17 @@ export const ingestCiReport = asyncHandler(async (req, res) => {
     );
   }
 
-  if (testRun && testRun.status !== TEST_RUN_STATUS.RUNNING) {
-    throw new ApiError(
-      409,
-      `Dashboard test run "${platformRunId}" is no longer running.`,
-    );
+  if (testRun && ((platformRunId && testRun.runId !== platformRunId) ||
+      testRun.ci?.provider !== "github-actions" ||
+      (testRun.ci.runId && testRun.ci.runId !== String(ci.runId)))) {
+    throw new ApiError(409, "Report identifiers do not match the registered workflow.");
+  }
+  if (testRun?.reportImportedAt || (existingCiRun?.status === TEST_RUN_STATUS.COMPLETED &&
+      await TestResult.exists({ runId: existingCiRun.runId }))) {
+    return res.status(200).json({ success: true, runId: testRun.runId, message: "Report already imported." });
+  }
+  if ([TEST_RUN_STATUS.CANCELLED, TEST_RUN_STATUS.CANCELLING].includes(testRun?.status)) {
+    return res.status(200).json({ success: true, ignored: true });
   }
 
   const runId = testRun?.runId || (await generateRunId());
@@ -594,6 +613,7 @@ export const ingestCiReport = asyncHandler(async (req, res) => {
       runId,
       results,
       adapted.environment,
+      { ciImport: true },
     );
 
     if (savedResults.length !== results.length) {
@@ -611,6 +631,8 @@ export const ingestCiReport = asyncHandler(async (req, res) => {
       {
         $set: {
           status: TEST_RUN_STATUS.COMPLETED,
+          reportImportedAt: completedAt,
+          error: null,
           completedAt,
           totalTests: summary.totalTests,
           completedTests: summary.totalTests,
@@ -670,6 +692,18 @@ export const ingestCiReport = asyncHandler(async (req, res) => {
 
 export const cancelTestRun = asyncHandler(async (req, res) => {
   const { id } = req.params;
+
+  const storedRun = await TestRun.findOneAndUpdate({
+    runId: id,
+    status: TEST_RUN_STATUS.RUNNING,
+    $or: [{ suiteId: { $ne: null } }, { "testCaseIds.0": { $exists: true } }],
+  }, {
+    status: TEST_RUN_STATUS.CANCELLING,
+    cancellationRequestedAt: new Date(),
+  });
+  if (storedRun) {
+    return res.status(202).json({ success: true, status: TEST_RUN_STATUS.CANCELLING });
+  }
 
   // Atomically reserve cancellation for an active GitHub Actions run.
   const run = await TestRun.findOneAndUpdate(

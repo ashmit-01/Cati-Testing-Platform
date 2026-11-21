@@ -98,7 +98,7 @@ jobs:
       - name: Register GitHub Actions run
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.platform_run_id != '' }}
         env:
-          BACKEND_URL: ${{ secrets.BACKEND_URL }}
+          QA_INGEST_URL: ${{ secrets.QA_INGEST_URL }}
           CI_INGESTION_TOKEN: ${{ secrets.CI_INGESTION_TOKEN }}
           PLATFORM_RUN_ID: ${{ inputs.platform_run_id }}
           GITHUB_RUN_ID: ${{ github.run_id }}
@@ -109,7 +109,12 @@ jobs:
           GITHUB_COMMIT: ${{ github.sha }}
         shell: bash
         run: |
-          BASE_URL="${BACKEND_URL%/}"
+          INGEST_URL="${QA_INGEST_URL%/}"
+          if [[ "$INGEST_URL" != */api/test-runs/ci ]]; then
+            echo "::error::QA_INGEST_URL must end in /api/test-runs/ci."
+            exit 1
+          fi
+          BASE_URL="${INGEST_URL%/api/test-runs/ci}"
 
           echo "Registering GitHub Actions run with CATI QA backend..."
 
@@ -159,8 +164,6 @@ jobs:
         env:
           TEST_SUITE: ${{ env.TEST_SUITE }}
           PLATFORM_RUN_ID: ${{ inputs.platform_run_id }}
-          QA_PROGRESS_INGEST_URL: ${{ secrets.QA_INGEST_URL }}
-          CI_INGESTION_TOKEN: ${{ secrets.CI_INGESTION_TOKEN }}
 
       # --------------------------------------------------
       # 9. Send final QA report to backend
